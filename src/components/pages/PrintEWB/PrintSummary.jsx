@@ -1,7 +1,8 @@
+
 import React, { useState } from 'react';
 import axios from 'axios';
 
-const EWBPrintSummary = () => {
+const PrintSummary = () => {
   const [ewbNos, setEwbNos] = useState([
     "451177338838",
     "431177338832",
@@ -98,4 +99,4 @@ const EWBPrintSummary = () => {
   );
 };
 
-export default EWBPrintSummary;
+export default PrintSummary;

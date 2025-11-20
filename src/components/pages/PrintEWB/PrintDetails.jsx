@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import axios from 'axios';
 
-const EWBPrintForm = () => {
+const PrintDetails = () => {
   const [ewbNos, setEwbNos] = useState(['451177338838']);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -80,4 +80,5 @@ const EWBPrintForm = () => {
   );
 };
 
-export default EWBPrintForm;
+export default PrintDetails;
+
