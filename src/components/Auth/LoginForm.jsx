@@ -6,7 +6,7 @@ const LOGIN_RESPONSE_KEY = "iris_login_data";
 const LoginForm = () => {
   const [formData, setFormData] = useState({
     email: "eway@gmail.com",
-    password: "Abcd@123456789",
+    password: "Abcd@12345",
   });
 
   const [loading, setLoading] = useState(false);
@@ -23,16 +23,16 @@ const LoginForm = () => {
     setError("");
     setResponseData(null);
 
-    const headers = {
-      "Content-Type": "application/json",
-      Accept: "application/json",
-    };
-
     try {
       const response = await axios.post(
         "http://localhost:3001/proxy/login",
         formData,
-        { headers }
+        {
+          headers: {
+            "Content-Type": "application/json",
+            Accept: "application/json",
+          },
+        }
       );
 
       setResponseData(response.data);
@@ -40,11 +40,15 @@ const LoginForm = () => {
       if (response.data.status === "SUCCESS") {
         const apiRes = response.data.response;
 
-        // NEW FORMAT FOR ALL COMPONENTS
+        // SAVE FULL LOGIN DETAILS — Used everywhere else
         const loginData = {
           token: apiRes.token,
           companyId: apiRes.companyid,
-          userGstin: apiRes.userGstin || "", // API sometimes returns GSTIN
+          userGstin: apiRes.userGstin || "",
+          email: formData.email,
+          userId: apiRes.userid || apiRes.userId || "",
+          userName: apiRes.username || "",
+          fullName: apiRes.fullName || apiRes.name || "",
         };
 
         localStorage.setItem(LOGIN_RESPONSE_KEY, JSON.stringify(loginData));
@@ -60,7 +64,6 @@ const LoginForm = () => {
     setLoading(false);
   };
 
-  // Live request preview
   const liveRequestInfo = {
     payload: formData,
     headers: {
@@ -99,8 +102,7 @@ const LoginForm = () => {
         </button>
       </form>
 
-      {/* PREVIEW BEFORE API */}
-      <div style={{ marginTop: 20, border: "1px solid #ddd", padding: 10, borderRadius: 4 }}>
+      <div style={{ marginTop: 20, border: "1px solid #ddd", padding: 10 }}>
         <h3>Request About To Be Sent:</h3>
 
         <strong>Payload:</strong>
@@ -114,9 +116,8 @@ const LoginForm = () => {
         </pre>
       </div>
 
-      {/* RESPONSE */}
       {responseData && (
-        <div style={{ marginTop: 20, border: "1px solid #ddd", padding: 10, borderRadius: 4 }}>
+        <div style={{ marginTop: 20, border: "1px solid #ddd", padding: 10 }}>
           <h3>API Response:</h3>
           <pre style={{ background: "#f5f5f5", padding: 10 }}>
             {JSON.stringify(responseData, null, 2)}

@@ -1,9 +1,8 @@
-
-import api from "../../api/irisgstApi";
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 
 // LocalStorage Keys
+const LOGIN_RESPONSE_KEY = 'iris_login_data';
 const LATEST_EWB_KEY = 'latestEwbData';
 const EWB_HISTORY_KEY = 'ewbHistory';
 
@@ -44,7 +43,7 @@ const GenerateEwb = () => {
     transDistance: 10,
     transDocDate: "15/11/2025",
     transDocNo: "1212",
-    transporterId: "05AAAAU1183B1Z0",
+    transporterId: "",
     transporterName: "ACVDF",
     vehicleNo: "RJ14CA9999",
     vehicleType: "R",
@@ -71,32 +70,42 @@ const GenerateEwb = () => {
       }
     ],
     companyId: null,
-    userGstin: "05AAAAU1183B5ZW",
+    userGstin: "",
     forceDuplicateCheck: true
   };
 
   const [formData, setFormData] = useState(defaultFormData);
+  const [authData, setAuthData] = useState({ companyId: '', token: '', userGstin: '' });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [apiResponse, setApiResponse] = useState(null);
 
-  // Auto-fill from login session
+  // ----------------- AUTOPOPULATE -----------------
   useEffect(() => {
-    const companyId = localStorage.getItem('companyId');
-    const userGstin = localStorage.getItem('userGstin') || localStorage.getItem('gstin');
+    // Load login data
+    const login = JSON.parse(localStorage.getItem(LOGIN_RESPONSE_KEY) || "{}");
 
-    if (companyId || userGstin) {
-      setFormData(prev => ({
-        ...prev,
-        companyId,
-        userGstin: userGstin || prev.userGstin,
-        fromGstin: userGstin || prev.fromGstin,
-        dispatchFromGstin: userGstin || prev.dispatchFromGstin,
-        transporterId: userGstin || prev.transporterId,
-      }));
-    }
+    setAuthData({
+      companyId: login.companyId || "",
+      token: login.token || "",
+      userGstin: login.userGstin || "",
+    });
+
+    // Fill formData from login
+    setFormData(prev => ({
+      ...prev,
+      companyId: login.companyId || prev.companyId,
+      userGstin: login.userGstin || prev.userGstin,
+      fromGstin: login.userGstin || prev.fromGstin,
+      dispatchFromGstin: login.userGstin || prev.dispatchFromGstin,
+      transporterId: login.userGstin || prev.transporterId
+    }));
+
+    // Load last saved EWB
+    const saved = JSON.parse(localStorage.getItem(LATEST_EWB_KEY) || "{}");
   }, []);
 
+  // ----------------- LOCAL STORAGE SAVE -----------------
   const saveToLocalStorage = (fullResponse) => {
     const resp = fullResponse.response;
     const ewbData = {
@@ -118,6 +127,7 @@ const GenerateEwb = () => {
     localStorage.setItem(EWB_HISTORY_KEY, JSON.stringify(history));
   };
 
+  // ----------------- FORM HANDLERS -----------------
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
@@ -148,6 +158,7 @@ const GenerateEwb = () => {
     }));
   };
 
+  // ----------------- SUBMIT HANDLER -----------------
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
@@ -155,8 +166,8 @@ const GenerateEwb = () => {
     setApiResponse(null);
 
     const headers = {
-      'X-Auth-Token': localStorage.getItem('token'),
-      'companyId': localStorage.getItem('companyId'),
+      'X-Auth-Token': authData.token || '',
+      'companyId': authData.companyId || '',
       'product': 'TOPAZ',
       'Content-Type': 'application/json'
     };
@@ -183,17 +194,18 @@ const GenerateEwb = () => {
   };
 
   const requestHeaders = {
-    'X-Auth-Token': localStorage.getItem('token'),
-    'companyId': localStorage.getItem('companyId'),
+    'X-Auth-Token': authData.token || '',
+    'companyId': authData.companyId || '',
     'product': 'TOPAZ',
     'Content-Type': 'application/json'
   };
 
+  // ----------------- JSX -----------------
   return (
     <div style={{ maxWidth: '1200px', margin: '20px auto', padding: '20px', fontFamily: 'Arial, sans-serif' }}>
       <h1 style={{ textAlign: 'center', color: '#2c3e50' }}>Generate E-Way Bill</h1>
 
-      {/* ======================= REQUEST PREVIEW UI ======================= */}
+      {/* Request Preview */}
       <div style={{ margin: '30px 0', padding: '20px', background: '#f1f2f6', borderRadius: '10px' }}>
         <h2 style={{ color: '#2f3542' }}>🔍 Request Preview</h2>
 
@@ -208,7 +220,7 @@ const GenerateEwb = () => {
         </pre>
       </div>
 
-      {/* ======================= FORM START ======================= */}
+      {/* Form */}
       <form onSubmit={handleSubmit}>
         {Object.keys(formData)
           .filter(key => key !== 'itemList')
@@ -270,11 +282,10 @@ const GenerateEwb = () => {
         </button>
       </form>
 
-      {/* API SUCCESS RESPONSE */}
+      {/* API Response */}
       {apiResponse && apiResponse.status === "SUCCESS" && (
         <div style={{ marginTop: '50px', padding: '30px', background: '#f8f9fa', border: '3px solid #27ae60', borderRadius: '12px' }}>
           <h2 style={{ textAlign: 'center', color: '#27ae60' }}>E-Way Bill Generated Successfully!</h2>
-
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '15px', margin: '20px 0', fontSize: '16px' }}>
             <div><strong>EWB No:</strong> <span style={{ fontSize: '22px', color: '#e67e22', fontWeight: 'bold' }}>{apiResponse.response.ewbNo}</span></div>
             <div><strong>Valid Upto:</strong> <span style={{ color: '#c0392b' }}>{apiResponse.response.validUpto}</span></div>
@@ -283,7 +294,6 @@ const GenerateEwb = () => {
             <div><strong>Invoice No:</strong> {apiResponse.response.docNo}</div>
             <div><strong>Total Value:</strong> ₹{apiResponse.response.totInvValue?.toLocaleString()}</div>
           </div>
-
           <details style={{ marginTop: '30px' }}>
             <summary style={{ fontWeight: 'bold', fontSize: '18px', cursor: 'pointer', color: '#2980b9' }}>
               View Complete API Response (JSON)
@@ -303,8 +313,5 @@ const GenerateEwb = () => {
     </div>
   );
 };
-
-
-
 
 export default GenerateEwb;

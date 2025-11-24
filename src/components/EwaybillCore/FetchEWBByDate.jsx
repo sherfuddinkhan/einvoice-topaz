@@ -26,28 +26,31 @@ const FetchEWBByDate = () => {
   // 🔵 Load Auth + Last EWB Auto Populate (Reading from Local Storage)
   // -----------------------------------------------------------
   useEffect(() => {
-    const login = JSON.parse(localStorage.getItem(LOGIN_RESPONSE_KEY) || "{}");
-    const latestEwb = JSON.parse(localStorage.getItem(LATEST_EWB_KEY) || "{}");
+  const login = JSON.parse(localStorage.getItem(LOGIN_RESPONSE_KEY) || "{}");
+  const latestEwb = JSON.parse(localStorage.getItem(LATEST_EWB_KEY) || "{}");
 
-    setAuthData({
-      companyId: login.companyId || "",
-      token: login.token || "",
-    });
+  setAuthData({
+    companyId: login.companyId || "",
+    token: login.token || "",
+  });
 
-    // 1. Auto-populate EWB Number
-    if (latestEwb?.ewbNo) setEwbNo(latestEwb.ewbNo);
+  // Auto-populate EWB Number
+  if (latestEwb?.ewbNo) setEwbNo(latestEwb.ewbNo);
 
-    // 2. Auto-populate User GSTIN from the saved 'fromGstin' property. (The fix)
-    if (latestEwb?.fromGstin) {
-      setUserGstin(latestEwb.fromGstin);
-    } else if (latestEwb?.response?.response?.fromGstin) {
-      // Fallback for older/nested data structure
-      setUserGstin(latestEwb.response.response.fromGstin);
-    }
+  // Auto-populate User GSTIN
+  const gstin =
+    latestEwb?.fromGstin || // top-level
+    latestEwb?.response?.fromGstin || // nested response
+    latestEwb?.response?.userGstin || // sometimes called userGstin
+    login.userGstin || // fallback to login
+    "";
 
-    // 3. Auto-populate response fields for the table
-    if (latestEwb?.response) setAutoFields(latestEwb.response);
-  }, []);
+  setUserGstin(gstin);
+
+  // Auto-populate table fields
+  if (latestEwb?.response) setAutoFields(latestEwb.response);
+}, []);
+
 
   // -----------------------------------------------------------
   // 🔴 Save History (last 10 entries)

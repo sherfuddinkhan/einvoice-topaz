@@ -54,9 +54,19 @@ app.post("/proxy/login", (req, res) =>
 // CHANGE PASSWORD
 app.post("/proxy/change-password", (req, res) =>
   proxyRequest(res, () =>
-    axios.post(`${BASE_URL}/irisgst/mgmt/public/user/changepassword`, req.body, { headers: { "Content-Type": "application/json", Accept: "application/json" } })
+    axios.post(
+      `${BASE_URL}/irisgst/mgmt/public/user/changepassword`,
+      req.body,
+      {
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/json",
+        },
+      }
+    )
   )
 );
+;
 
 /* ======================================================================
    2. EWAYBILL CORE (TOPAZ)

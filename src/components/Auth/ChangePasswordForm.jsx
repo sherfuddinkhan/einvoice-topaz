@@ -1,17 +1,22 @@
-import React, { useState } from 'react';
-import axios from 'axios';
+import React, { useState } from "react";
+import axios from "axios";
+
+const LOGIN_RESPONSE_KEY = "iris_login_data";
 
 const ChangePasswordForm = () => {
+  const loginData = JSON.parse(localStorage.getItem(LOGIN_RESPONSE_KEY) || "{}");
+
   const [formData, setFormData] = useState({
-    currentPassword: '',
-    newPassword: '',
-    confirmPassword: '',
+    email: loginData.email || "eway@gmail.com",
+    curentpassword: "Abcd@123456789",
+    newpassword: "",
+    confirmpassword: "",
     changePasswordFromLogin: true,
-    email: localStorage.getItem('email') || '', // Pre-fill from login
   });
+
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
-  const [responseData, setResponseData] = useState(null); // API Response
+  const [error, setError] = useState("");
+  const [responseData, setResponseData] = useState(null);
 
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -20,56 +25,54 @@ const ChangePasswordForm = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    if (formData.newPassword !== formData.confirmPassword) {
-      setError('Passwords do not match');
+    // ONLY CHECK – passwords should match
+    if (formData.newpassword !== formData.confirmpassword) {
+      setError("Passwords do not match");
       return;
     }
 
     setLoading(true);
-    setError('');
+    setError("");
     setResponseData(null);
-
-    // Headers for the request
-    const headers = {
-      'Content-Type': 'application/json',
-      Accept: 'application/json',
-    };
 
     try {
       const response = await axios.post(
-        'http://localhost:3001/proxy/change-password',
+        "http://localhost:3001/proxy/change-password",
         formData,
-        { headers }
+        {
+          headers: {
+            Authorization: loginData.token,
+            "Content-Type": "application/json",
+            Accept: "application/json",
+          },
+        }
       );
 
       setResponseData(response.data);
+      alert("Password changed successfully!");
 
-      if (response.data.status === 'SUCCESS') {
-        localStorage.setItem('token', response.data.response['X-Auth-Token']);
-        alert('Password changed successfully!');
-        // Redirect to dashboard if needed
-      }
     } catch (err) {
       const errorResponse = err.response?.data || { error: err.message };
       setResponseData(errorResponse);
-      setError(errorResponse.message || errorResponse.error || 'Change password failed');
+      setError(errorResponse.error || "Error changing password");
     }
 
     setLoading(false);
   };
 
-  // Live request preview before sending
   const liveRequestInfo = {
     payload: formData,
     headers: {
-      'Content-Type': 'application/json',
-      Accept: 'application/json',
+      Authorization: loginData.token,
+      "Content-Type": "application/json",
+      Accept: "application/json",
     },
   };
 
   return (
-    <div style={{ maxWidth: '400px', margin: 'auto', padding: '20px' }}>
+    <div style={{ maxWidth: "420px", margin: "auto", padding: "20px" }}>
       <h2>Change Password</h2>
+
       <form onSubmit={handleSubmit}>
         <input
           type="email"
@@ -78,65 +81,72 @@ const ChangePasswordForm = () => {
           value={formData.email}
           onChange={handleChange}
           required
-          style={{ display: 'block', margin: '10px 0', width: '100%', padding: '8px' }}
+          style={{ margin: "10px 0", width: "100%", padding: "10px" }}
         />
+
         <input
           type="password"
-          name="currentPassword"
+          name="curentpassword"
           placeholder="Current Password"
-          value={formData.currentPassword}
+          value={formData.curentpassword}
           onChange={handleChange}
           required
-          style={{ display: 'block', margin: '10px 0', width: '100%', padding: '8px' }}
+          style={{ margin: "10px 0", width: "100%", padding: "10px" }}
         />
+
         <input
           type="password"
-          name="newPassword"
+          name="newpassword"
           placeholder="New Password"
-          value={formData.newPassword}
+          value={formData.newpassword}
           onChange={handleChange}
           required
-          style={{ display: 'block', margin: '10px 0', width: '100%', padding: '8px' }}
+          style={{ margin: "10px 0", width: "100%", padding: "10px" }}
         />
+
         <input
           type="password"
-          name="confirmPassword"
+          name="confirmpassword"
           placeholder="Confirm New Password"
-          value={formData.confirmPassword}
+          value={formData.confirmpassword}
           onChange={handleChange}
           required
-          style={{ display: 'block', margin: '10px 0', width: '100%', padding: '8px' }}
+          style={{ margin: "10px 0", width: "100%", padding: "10px" }}
         />
-        <button type="submit" disabled={loading} style={{ width: '100%', padding: '10px' }}>
-          {loading ? 'Changing...' : 'Change Password'}
+
+        <button
+          type="submit"
+          disabled={loading}
+          style={{
+            width: "100%",
+            padding: "12px",
+            backgroundColor: "#4CAF50",
+            color: "#fff",
+            border: "none",
+            cursor: "pointer",
+          }}
+        >
+          {loading ? "Changing..." : "Change Password"}
         </button>
       </form>
 
-      {/* Live Request Preview */}
-      <div style={{ marginTop: '20px', border: '1px solid #ddd', padding: '10px', borderRadius: '4px' }}>
-        <h3>Request About to be Sent:</h3>
+      <div style={{ marginTop: "20px", border: "1px solid #ddd", padding: "10px" }}>
+        <h3>Request Preview</h3>
         <strong>Payload:</strong>
-        <pre style={{ background: '#f5f5f5', padding: '10px', overflow: 'auto' }}>
-          {JSON.stringify(liveRequestInfo.payload, null, 2)}
-        </pre>
+        <pre>{JSON.stringify(liveRequestInfo.payload, null, 2)}</pre>
+
         <strong>Headers:</strong>
-        <pre style={{ background: '#f5f5f5', padding: '10px', overflow: 'auto' }}>
-          {JSON.stringify(liveRequestInfo.headers, null, 2)}
-        </pre>
+        <pre>{JSON.stringify(liveRequestInfo.headers, null, 2)}</pre>
       </div>
 
-      {/* API Response */}
       {responseData && (
-        <div style={{ marginTop: '20px', border: '1px solid #ddd', padding: '10px', borderRadius: '4px' }}>
-          <h3>API Response:</h3>
-          <pre style={{ background: '#f5f5f5', padding: '10px', overflow: 'auto' }}>
-            {JSON.stringify(responseData, null, 2)}
-          </pre>
+        <div style={{ marginTop: "20px", border: "1px solid #ddd", padding: "10px" }}>
+          <h3>API Response</h3>
+          <pre>{JSON.stringify(responseData, null, 2)}</pre>
         </div>
       )}
 
-      {/* Error */}
-      {error && <p style={{ color: 'red', marginTop: '10px' }}>{error}</p>}
+      {error && <p style={{ color: "red", marginTop: "10px" }}>{error}</p>}
     </div>
   );
 };

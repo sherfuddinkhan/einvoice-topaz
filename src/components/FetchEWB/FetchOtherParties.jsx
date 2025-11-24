@@ -2,11 +2,10 @@ import api from "../../api/irisgstApi";
 import React, { useState, useEffect } from "react";
 import axios from "axios";
 
-
 const LOGIN_RESPONSE_KEY = "iris_login_data";
 const LATEST_EWB_KEY = "latestEwbData";
 
-const  FetchOtherParties = () => {
+const FetchOtherParties = () => {
   const [authData, setAuthData] = useState({
     companyId: "",
     token: "",
@@ -35,7 +34,13 @@ const  FetchOtherParties = () => {
   const [requestPreview, setRequestPreview] = useState(null);
   const [responsePreview, setResponsePreview] = useState(null);
 
-  // 🔹 Auto-populate fields from last EWB
+  // 👇 Helper: Clear previews whenever user edits anything
+  const resetButton = () => {
+    setRequestPreview(null);
+    setResponsePreview(null);
+  };
+
+  // Auto-fill data
   useEffect(() => {
     const login = JSON.parse(localStorage.getItem(LOGIN_RESPONSE_KEY) || "{}");
     const lastEwb = JSON.parse(localStorage.getItem(LATEST_EWB_KEY) || "{}");
@@ -67,7 +72,6 @@ const  FetchOtherParties = () => {
 
   const generateCEWB = async () => {
     const url = "https://stage-api.irisgst.com/irisgst/topaz/api/v0.3/cewb";
-
     setRequestPreview({ url, headers, body: payload });
 
     try {
@@ -89,9 +93,10 @@ const  FetchOtherParties = () => {
           <input
             type="text"
             value={headers[key]}
-            onChange={(e) =>
-              setHeaders((prev) => ({ ...prev, [key]: e.target.value }))
-            }
+            onChange={(e) => {
+              resetButton(); // 🔥 Clears previews → button resets
+              setHeaders((prev) => ({ ...prev, [key]: e.target.value }));
+            }}
             style={{ width: "100%", padding: 8 }}
           />
         </div>
@@ -106,15 +111,16 @@ const  FetchOtherParties = () => {
               <input
                 type="text"
                 value={payload[key].join(", ")}
-                onChange={(e) =>
+                onChange={(e) => {
+                  resetButton();
                   setPayload((prev) => ({
                     ...prev,
                     [key]: e.target.value
                       .split(",")
                       .map((v) => v.trim())
                       .filter((v) => v),
-                  }))
-                }
+                  }));
+                }}
                 style={{ width: "100%", padding: 8 }}
               />
             </div>
@@ -127,18 +133,20 @@ const  FetchOtherParties = () => {
             <input
               type={key === "transMode" || key === "fromState" ? "number" : "text"}
               value={payload[key]}
-              onChange={(e) =>
+              onChange={(e) => {
+                resetButton(); // 🔥 Button resets on ANY change
                 setPayload((prev) => ({
                   ...prev,
                   [key]: e.target.value,
-                }))
-              }
+                }));
+              }}
               style={{ width: "100%", padding: 8 }}
             />
           </div>
         );
       })}
 
+      {/* 👇 Button automatically resets because previews are cleared */}
       <button
         onClick={generateCEWB}
         style={{
@@ -149,7 +157,7 @@ const  FetchOtherParties = () => {
           cursor: "pointer",
         }}
       >
-        Generate CEWB
+        {responsePreview ? "Submitted ✔" : "Generate CEWB"}
       </button>
 
       <hr />
@@ -167,4 +175,4 @@ const  FetchOtherParties = () => {
   );
 };
 
-export default  FetchOtherParties;
+export default FetchOtherParties;
