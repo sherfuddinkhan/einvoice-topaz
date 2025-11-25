@@ -7,6 +7,16 @@ const LOGIN_RESPONSE_KEY = "iris_login_data";
 const LATEST_EWB_KEY = "latestEwbData";
 const STORAGE_KEY = "EWB_PREVIOUS_DATA";
 const HEADER_KEY = "EWB_HEADER_DATA";
+// Helper to read JSON safely
+const getLocalStorageData = (key) => {
+  try {
+    const raw = localStorage.getItem(key);
+    console.log(`📥 Loaded ${key}:`, raw);
+    return JSON.parse(raw || "{}");
+  } catch {
+    return {};
+  }
+};
 
 const BulkByDocNum = () => {
   // --------------------------
@@ -17,25 +27,27 @@ const BulkByDocNum = () => {
     authToken: "",
     product: "TOPAZ"
   });
-
+  
   // --------------------------
   // PAYLOAD STATE
   // --------------------------
   const [payload, setPayload] = useState({
     userGstin: "",
     docType: "INV",
-    docNumList: [""]
+    docNumList: [ ]
   });
-
+  const [payloadText, setPayloadText] = useState("");
+  const [authData, setAuthData] = useState({ token: "", companyId: "", userGstin: "" });
   const [loading, setLoading] = useState(false);
   const [response, setResponse] = useState(null);
+   const [error, setError] = useState("");
 
   // ======================================
   // 🔥 AUTOFILL FROM LOCALSTORAGE + LOGIN
   // ======================================
   useEffect(() => {
     const login = JSON.parse(localStorage.getItem(LOGIN_RESPONSE_KEY) || "{}");
-    const latest = JSON.parse(localStorage.getItem(LATEST_EWB_KEY) || "{}");
+    const savedEwbData = getLocalStorageData(LATEST_EWB_KEY);
     const savedPayload = JSON.parse(localStorage.getItem(STORAGE_KEY) || "{}");
     const savedHeader = JSON.parse(localStorage.getItem(HEADER_KEY) || "{}");
 
@@ -46,20 +58,59 @@ const BulkByDocNum = () => {
       authToken: savedHeader?.authToken || login?.token || "",
       product: savedHeader?.product || "TOPAZ"
     }));
+     let transDocNo       = [""];
+    let previousGstin    = " ";  // → userGstin (sender's GSTIN)
 
-    // AUTOFILL PAYLOAD
-    setPayload(prev => ({
-      ...prev,
-      userGstin: savedPayload?.userGstin || login?.gstin || "",
-      docType: savedPayload?.docType || "INV",
-      docNumList:
-        savedPayload?.docNumList?.length > 0
-          ? savedPayload.docNumList
-          : latest?.docNo
-          ? [latest.docNo]
-          : [""]
-    }));
+      // ───── Extract fromGstin → userGstin (as array) ─────
+if (savedEwbData?.fullApiResponse?.response?.fromGstin) {
+  previousGstin = savedEwbData.fullApiResponse.response.fromGstin;
+}
+else if (savedEwbData?.fromGstin) {
+  previousGstin = savedEwbData.fromGstin;
+}
+
+// Fallback GSTIN if still empty
+if (previousGstin.length === 0) {
+  previousGstin = "05AAAAU1183B5ZW"; // or your default like "351010498047" if preferred
+}
+
+// ───── Extract transDocNo→ transDocNo ─────
+if (savedEwbData?.fullApiResponse?.response?.transDocNo) {
+ transDocNo= [savedEwbData.fullApiResponse.response.transDocNo];
+}
+else if (savedEwbData?.transDocNo) {
+  transDocNo = [savedEwbData.transDocNo];
+}
+// Fallback transDocNoif still empty
+if (transDocNo.length === 0) {
+  transDocNo = ["14245"]; // or your default like "351010498047" if preferred
+}
+
+  const initialPayload = {
+      docNumList: transDocNo,  
+      userGstin: previousGstin,
+      docType: "INV",
+    };
+
+    console.log("📦 Payload:", initialPayload);
+
+    setPayload(initialPayload);
+    setPayloadText(JSON.stringify(initialPayload, null, 2));
+
   }, []);
+
+    // JSON Payload Edit
+  // --------------------------
+  const handlePayloadChange = (text) => {
+    setPayloadText(text);
+    try {
+      const parsed = JSON.parse(text);
+      setPayload(parsed);
+      setError("");
+    } catch {
+      setError("Invalid JSON");
+    }
+  };
 
   // Save headers to localStorage
   const saveHeaders = (data) =>
@@ -206,6 +257,18 @@ const BulkByDocNum = () => {
           + Add More Doc Numbers
         </button>
       </div>
+       {/* Payload Editor */}
+      <div style={{ marginBottom: 20 }}>
+        <h3>Payload JSON</h3>
+        <textarea
+          rows={14}
+          value={payloadText}
+          style={{ width: "100%", fontFamily: "monospace" }}
+          onChange={(e) => handlePayloadChange(e.target.value)}
+        />
+        {error && <p style={{ color: "red" }}>{error}</p>}
+      </div>
+
 
       {/* SUBMIT */}
       <button

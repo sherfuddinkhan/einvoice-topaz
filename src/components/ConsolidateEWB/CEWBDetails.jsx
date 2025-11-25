@@ -68,8 +68,8 @@ const CEWBDetails = () => {
     console.log("📌 Headers:", headerObj);
 
     // --------------------------
-    let previousEwbs     = [];  // → tripSheetEwbBills
-    let previousGstin    = [];  // → userGstin (sender's GSTIN)
+    let previousEwbs     = "";  // → tripSheetEwbBills
+    let previousGstin    = " ";  // → userGstin (sender's GSTIN)
     let fromPlace        = "";
     let fromStateCode    = "";
     let transMode        = "";
@@ -77,101 +77,106 @@ const CEWBDetails = () => {
     let transDocNo       = "";
     let vehicleNo        = "";
 
+   let tripSheetEwbBills = [];
+
     if (Array.isArray(savedEwbData.allEwbs)) {
-      previousEwbs = savedEwbData.allEwbs.map(x => x.ewbNo).filter(Boolean);
+      previousEwbs = savedEwbData.allEwbs.map((x) => x.ewbNo).filter(Boolean);
     } else if (savedEwbData?.response?.ewbNo) {
       previousEwbs = [savedEwbData.response.ewbNo];
     } else if (savedEwbData?.ewbNo) {
-      previousEwbs = [savedEwbData.ewbNo];
+     previousEwbs = [savedEwbData.ewbNo];
     }
-    if (previousEwbs.length === 0) previousEwbs = ["351010498047"];
+
+  // fallback
+if (previousEwbs.length === 0) previousEwbs = ["351010498047"];
+
 
     
   // ───── Extract fromGstin → userGstin (as array) ─────
 if (savedEwbData?.fullApiResponse?.response?.fromGstin) {
-  previousGstin = [savedEwbData.fullApiResponse.response.fromGstin];
+  previousGstin = savedEwbData.fullApiResponse.response.fromGstin;
 }
 else if (savedEwbData?.fromGstin) {
-  previousGstin = [savedEwbData.fromGstin];
+  previousGstin = savedEwbData.fromGstin;
 }
 
 // Fallback GSTIN if still empty
 if (previousGstin.length === 0) {
-  previousGstin = ["05AAAAU1183B5ZW"]; // or your default like "351010498047" if preferred
+  previousGstin = "05AAAAU1183B5ZW"; // or your default like "351010498047" if preferred
 }
 
   // ───── Extract place → fromplace (as array) ─────
 if (savedEwbData?.fullApiResponse?.response?.fromPlace) {
-  fromPlace= [savedEwbData.fullApiResponse.response.fromPlace];
+  fromPlace= savedEwbData.fullApiResponse.response.fromPlace;
 }
 else if (savedEwbData?.fromPlace) {
-  fromPlace= [savedEwbData.fromPlace];
+  fromPlace= savedEwbData.fromPlace;
 }
 
 // Fallback GSTIN if still empty
 if (fromPlace.length === 0) {
-  fromPlace= ["Akhondiya"]; // or your default like "351010498047" if preferred
+  fromPlace= "Akhondiya"; // or your default like "351010498047" if preferred
 }
 ///////////////////////////////////////////////////
  // ───── Extract state → fromstate (as array) ─────
 if (savedEwbData?.fullApiResponse?.response?.fromStateCode) {
-  fromStateCode= [savedEwbData.fullApiResponse.response.fromStateCode];
+  fromStateCode= savedEwbData.fullApiResponse.response.fromStateCode;
 }
 else if (savedEwbData?.fromStateCode) {
-  fromStateCode= [savedEwbData.fromStateCode];
+  fromStateCode= savedEwbData.fromStateCode;
 }
 
 // Fallback GSTIN if still empty
 if (fromPlace.length === 0) {
-  fromStateCode= ["5"]; // or your default like "351010498047" if preferred
+  fromStateCode= "5"; // or your default like "351010498047" if preferred
 }
 /////////////////////////////////
- // ───── Extract vehicleNo → fromvehicleNo (as array) ─────
-if (savedEwbData?.fullApiResponse?.itemList?.transDocNo) {
- transDocNo= [savedEwbData.fullApiResponse.itemList.transDocNo];
+ // ───── Extract transDocNo→ transDocNo ─────
+if (savedEwbData?.fullApiResponse?.response?.transDocNo) {
+ transDocNo= savedEwbData.fullApiResponse.response.transDocNo;
 }
 else if (savedEwbData?.transDocNo) {
-  transDocNo = [savedEwbData.transDocNo];
+  transDocNo = savedEwbData.transDocNo;
 }
 
 // Fallback GSTIN if still empty
 if (transDocNo.length === 0) {
-   transDocNo= ["1234"]; // or your default like "351010498047" if preferred
+   transDocNo= "1234"; // or your default like "351010498047" if preferred
 }
 /////////////////////////////////
-if (savedEwbData?.fullApiResponse?.itemList?.transDocDate) {
- transDocDate= [savedEwbData.fullApiResponse.itemList.transDocDate];
+if (savedEwbData?.fullApiResponse?.response?.transDocDate) {
+ transDocDate= savedEwbData.fullApiResponse.response.transDocDate;
 }
 else if (savedEwbData?.transDocDate) {
-  transDocDate= [savedEwbData.transDocDate];
+  transDocDate= savedEwbData.transDocDate;
 }
 
 // Fallback GSTIN if still empty
 if (transDocDate.length === 0) {
-  transDocDate= ["12/11/2025"]; // or your default like "351010498047" if preferred
+  transDocDate= "12/11/2025"; // or your default like "351010498047" if preferred
 }
 //////////////////
-if (savedEwbData?.fullApiResponse?.itemList?.vehicleNo) {
-  fromPlace= [savedEwbData.fullApiResponse.itemList.vehicleNo];
+if (savedEwbData?.fullApiResponse?.response?.vehicleNo) {
+  vehicleNo= savedEwbData.fullApiResponse.response.vehicleNo;
 }
 else if (savedEwbData?.vehicleNo) {
-  fromPlace= [savedEwbData.vehicleNo];
+  vehicleNo=savedEwbData.vehicleNo;
 }
 
 // Fallback GSTIN if still empty
 if (vehicleNo.length === 0) {
-  vehicleNo = ["10092"]; // or your default like "351010498047" if preferred
+  vehicleNo = "10092"; // or your default like "351010498047" if preferred
 }
 ////////////////////////
-if (savedEwbData?.fullApiResponse?.itemList?.transMode) {
-  transMode= [savedEwbData.fullApiResponse.itemList.transMode];
+if (savedEwbData?.fullApiResponse?.response?.transMode) {
+  transMode= savedEwbData.fullApiResponse.response.transMode;
 }
 else if (savedEwbData?.transMode) {
-  transMode= [savedEwbData.transMode];
+  transMode= savedEwbData.transMode;
 }
 // Fallback GSTIN if still empty
 if (transMode.transMode === 0) {
-  transMode= ["3"]; // or your default like "351010498047" if preferred
+  transMode= "3"; // or your default like "351010498047" if preferred
 }
 
     console.log("📌 tripSheetEwbBills:", previousEwbs);
@@ -232,44 +237,46 @@ if (transMode.transMode === 0) {
   // SUBMIT CEWB
   // --------------------------
   const handleSubmit = async () => {
-    setLoading(true);
-    setError("");
-    setResponse(null);
+  setLoading(true);
+  setError("");
+  setResponse(null);
 
-    try {
-      const res = await axios.post(
-        "http://localhost:3001/proxy/topaz/cewb/generate",
-        payload,
-        { headers }
-      );
+  try {
+    // 1️⃣ Call CEWB API
+    const res = await axios.post(
+      "http://localhost:3001/proxy/topaz/cewb/generate",
+      payload,
+      { headers }
+    );
 
-      console.log("🎉 CEWB Response:", res.data);
-      setResponse(res.data);
+    console.log("🎉 CEWB Response:", res.data);
+    setResponse(res.data);
 
-      // Save updated CEWB data
-      const saved = getLocalStorageData(LATEST_EWB_KEY);
-      const allEwbs = saved.allEwbs || [];
+    // 2️⃣ Save updated CEWB locally
+    const saved = getLocalStorageData(LATEST_EWB_KEY);
+    const allEwbs = [...(saved.allEwbs || [])];
 
-      if (res.data.response?.cEwbNo) {
-        allEwbs.push({ ewbNo: res.data.response.cEwbNo });
-      }
-
-      const updated = {
-        ...saved,
-        cewbResponse: res.data.response,
-        allEwbs,
-      };
-
-      console.log("💾 Saving CEWB:", updated);
-      localStorage.setItem(LATEST_EWB_KEY, JSON.stringify(updated));
-    } catch (err) {
-      console.error("❌ API Error:", err);
-      setError(err.response?.data?.message || err.message);
-      setResponse(err.response?.data || null);
+    if (res.data.response?.cEwbNo) {
+      allEwbs.push({ ewbNo: res.data.response.cEwbNo });
     }
 
+    const updated = {
+      ...saved,
+      cewbResponse: res.data.response,
+      allEwbs,
+    };
+
+    console.log("💾 Saving CEWB:", updated);
+    localStorage.setItem(LATEST_EWB_KEY, JSON.stringify(updated));
+  } catch (err) {
+    console.error("❌ API Error:", err);
+    setError(err?.response?.data?.message || err.message || "API Error");
+    setResponse(err?.response?.data || null);
+  } finally {
     setLoading(false);
-  };
+  }
+};
+
 
   // --------------------------
   // UI
