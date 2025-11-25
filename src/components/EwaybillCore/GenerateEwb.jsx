@@ -43,7 +43,7 @@ const GenerateEwb = () => {
     transDistance: 10,
     transDocDate: "15/11/2025",
     transDocNo: "1212",
-    transporterId: "",
+    transporterId: "05AAAAU1183B1Z0",
     transporterName: "ACVDF",
     vehicleNo: "RJ14CA9999",
     vehicleType: "R",
@@ -70,7 +70,7 @@ const GenerateEwb = () => {
       }
     ],
     companyId: null,
-    userGstin: "",
+    userGstin: "05AAAAU1183B5ZW",
     forceDuplicateCheck: true
   };
 

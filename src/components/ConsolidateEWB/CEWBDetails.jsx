@@ -5,10 +5,12 @@ import axios from "axios";
 const LOGIN_RESPONSE_KEY = "iris_login_data";
 const LATEST_EWB_KEY = "latestEwbData";
 
-// Helper to get data from localStorage
+// Helper to read JSON safely
 const getLocalStorageData = (key) => {
   try {
-    return JSON.parse(localStorage.getItem(key) || "{}");
+    const raw = localStorage.getItem(key);
+    console.log(`📥 Loaded ${key}:`, raw);
+    return JSON.parse(raw || "{}");
   } catch {
     return {};
   }
@@ -29,54 +31,183 @@ const CEWBDetails = () => {
   const [error, setError] = useState("");
   const [response, setResponse] = useState(null);
 
+  // --------------------------
+  // AUTO POPULATE on mount
+  // --------------------------
   useEffect(() => {
     const login = getLocalStorageData(LOGIN_RESPONSE_KEY);
     const savedEwbData = getLocalStorageData(LATEST_EWB_KEY);
 
-    const gstin = login.userGstin || "";
-    const companyId = login.companyId || 4;
+    console.log("🔎 login:", login);
+    console.log("🔎 savedEwbData:", savedEwbData);
+
+    // --------------------------
+    // Extract
+    // --------------------------
+    const gstin = savedEwbData?.response?.fromGstin || login.userGstin || "";
+    const companyId = login.companyId || 7;
     const token = login.token || "";
+
+    console.log("➡ GSTIN:", gstin);
+    console.log("➡ CompanyId:", companyId);
+    console.log("➡ Token:", token);
 
     setAuthData({ token, companyId, userGstin: gstin });
 
-    // Headers
-    setHeaders({
+    // --------------------------
+    // Set Headers
+    // --------------------------
+    const headerObj = {
       "X-Auth-Token": token,
       companyId,
       product: "TOPAZ",
       "Content-Type": "application/json",
       accept: "application/json",
-    });
+    };
+    setHeaders(headerObj);
+    console.log("📌 Headers:", headerObj);
 
-    // Auto-populate tripSheetEwbBills
-    let previousEwbs = [];
-    if (savedEwbData) {
-      if (Array.isArray(savedEwbData.allEwbs)) {
-        previousEwbs = savedEwbData.allEwbs.map(item => item.ewbNo).filter(Boolean);
-      } else if (savedEwbData.ewbNo) {
-        previousEwbs = [savedEwbData.ewbNo];
-      }
+    // --------------------------
+    let previousEwbs     = [];  // → tripSheetEwbBills
+    let previousGstin    = [];  // → userGstin (sender's GSTIN)
+    let fromPlace        = "";
+    let fromStateCode    = "";
+    let transMode        = "";
+    let transDocDate     = "";
+    let transDocNo       = "";
+    let vehicleNo        = "";
+
+    if (Array.isArray(savedEwbData.allEwbs)) {
+      previousEwbs = savedEwbData.allEwbs.map(x => x.ewbNo).filter(Boolean);
+    } else if (savedEwbData?.response?.ewbNo) {
+      previousEwbs = [savedEwbData.response.ewbNo];
+    } else if (savedEwbData?.ewbNo) {
+      previousEwbs = [savedEwbData.ewbNo];
     }
-    if (previousEwbs.length === 0) previousEwbs = ["351010498047"]; // fallback
+    if (previousEwbs.length === 0) previousEwbs = ["351010498047"];
 
-    // Initial payload
+    
+  // ───── Extract fromGstin → userGstin (as array) ─────
+if (savedEwbData?.fullApiResponse?.response?.fromGstin) {
+  previousGstin = [savedEwbData.fullApiResponse.response.fromGstin];
+}
+else if (savedEwbData?.fromGstin) {
+  previousGstin = [savedEwbData.fromGstin];
+}
+
+// Fallback GSTIN if still empty
+if (previousGstin.length === 0) {
+  previousGstin = ["05AAAAU1183B5ZW"]; // or your default like "351010498047" if preferred
+}
+
+  // ───── Extract place → fromplace (as array) ─────
+if (savedEwbData?.fullApiResponse?.response?.fromPlace) {
+  fromPlace= [savedEwbData.fullApiResponse.response.fromPlace];
+}
+else if (savedEwbData?.fromPlace) {
+  fromPlace= [savedEwbData.fromPlace];
+}
+
+// Fallback GSTIN if still empty
+if (fromPlace.length === 0) {
+  fromPlace= ["Akhondiya"]; // or your default like "351010498047" if preferred
+}
+///////////////////////////////////////////////////
+ // ───── Extract state → fromstate (as array) ─────
+if (savedEwbData?.fullApiResponse?.response?.fromStateCode) {
+  fromStateCode= [savedEwbData.fullApiResponse.response.fromStateCode];
+}
+else if (savedEwbData?.fromStateCode) {
+  fromStateCode= [savedEwbData.fromStateCode];
+}
+
+// Fallback GSTIN if still empty
+if (fromPlace.length === 0) {
+  fromStateCode= ["5"]; // or your default like "351010498047" if preferred
+}
+/////////////////////////////////
+ // ───── Extract vehicleNo → fromvehicleNo (as array) ─────
+if (savedEwbData?.fullApiResponse?.itemList?.transDocNo) {
+ transDocNo= [savedEwbData.fullApiResponse.itemList.transDocNo];
+}
+else if (savedEwbData?.transDocNo) {
+  transDocNo = [savedEwbData.transDocNo];
+}
+
+// Fallback GSTIN if still empty
+if (transDocNo.length === 0) {
+   transDocNo= ["1234"]; // or your default like "351010498047" if preferred
+}
+/////////////////////////////////
+if (savedEwbData?.fullApiResponse?.itemList?.transDocDate) {
+ transDocDate= [savedEwbData.fullApiResponse.itemList.transDocDate];
+}
+else if (savedEwbData?.transDocDate) {
+  transDocDate= [savedEwbData.transDocDate];
+}
+
+// Fallback GSTIN if still empty
+if (transDocDate.length === 0) {
+  transDocDate= ["12/11/2025"]; // or your default like "351010498047" if preferred
+}
+//////////////////
+if (savedEwbData?.fullApiResponse?.itemList?.vehicleNo) {
+  fromPlace= [savedEwbData.fullApiResponse.itemList.vehicleNo];
+}
+else if (savedEwbData?.vehicleNo) {
+  fromPlace= [savedEwbData.vehicleNo];
+}
+
+// Fallback GSTIN if still empty
+if (vehicleNo.length === 0) {
+  vehicleNo = ["10092"]; // or your default like "351010498047" if preferred
+}
+////////////////////////
+if (savedEwbData?.fullApiResponse?.itemList?.transMode) {
+  transMode= [savedEwbData.fullApiResponse.itemList.transMode];
+}
+else if (savedEwbData?.transMode) {
+  transMode= [savedEwbData.transMode];
+}
+// Fallback GSTIN if still empty
+if (transMode.transMode === 0) {
+  transMode= ["3"]; // or your default like "351010498047" if preferred
+}
+
+    console.log("📌 tripSheetEwbBills:", previousEwbs);
+    console.log("📌 userGstin:", previousGstin);
+    console.log("📌 fromPlace:", fromPlace);
+    console.log("📌 fromStateCode", fromStateCode);
+    console.log("📌 transMode", transMode);
+    console.log("📌 transDocDate ", transDocDate );
+    console.log("📌 transDocNo", transDocNo);
+    console.log("📌 transDocNo", vehicleNo);
+    // --------------------------
+    // Build Payload (using response.* fields)
+    // --------------------------
+    const r = savedEwbData.response || {};
+
     const initialPayload = {
-      fromPlace: savedEwbData?.cewbResponse?.fromPlace || "Akodiya",
-      fromState: savedEwbData?.cewbResponse?.fromStateCode || 5,
-      vehicleNo: savedEwbData?.cewbResponse?.vehicleNo || "RJ14CA9999",
-      transMode: savedEwbData?.cewbResponse?.transMode || 1,
-      transDocNo: savedEwbData?.cewbResponse?.transDocNo || "1212",
-      transDocDate: savedEwbData?.cewbResponse?.transDocDate || "15/11/2025",
+      fromPlace: fromPlace,
+      fromState: fromStateCode || 7,
+      vehicleNo: vehicleNo || "RJ14CA9999",
+      transMode: transMode,
+      transDocNo: transDocNo || "1212",
+      transDocDate: transDocDate || "15/11/2025",
       tripSheetEwbBills: previousEwbs,
       companyId,
-      userGstin: gstin,
+      userGstin: previousGstin,
     };
+
+    console.log("📦 Payload:", initialPayload);
 
     setPayload(initialPayload);
     setPayloadText(JSON.stringify(initialPayload, null, 2));
   }, []);
 
-  // Handle editable payload textarea
+  // --------------------------
+  // JSON Payload Edit
+  // --------------------------
   const handlePayloadChange = (text) => {
     setPayloadText(text);
     try {
@@ -84,14 +215,22 @@ const CEWBDetails = () => {
       setPayload(parsed);
       setError("");
     } catch {
-      setError("Invalid JSON format");
+      setError("Invalid JSON");
     }
   };
 
-  // Handle editable headers
-  const handleHeaderChange = (key, value) => setHeaders({ ...headers, [key]: value });
+  // --------------------------
+  // Header edit
+  // --------------------------
+  const handleHeaderChange = (key, value) => {
+    const updated = { ...headers, [key]: value };
+    console.log("✏ Updated Header:", updated);
+    setHeaders(updated);
+  };
 
-  // Submit CEWB generation
+  // --------------------------
+  // SUBMIT CEWB
+  // --------------------------
   const handleSubmit = async () => {
     setLoading(true);
     setError("");
@@ -103,16 +242,28 @@ const CEWBDetails = () => {
         payload,
         { headers }
       );
+
+      console.log("🎉 CEWB Response:", res.data);
       setResponse(res.data);
 
-      // Save CEWB response to localStorage
+      // Save updated CEWB data
       const saved = getLocalStorageData(LATEST_EWB_KEY);
       const allEwbs = saved.allEwbs || [];
+
       if (res.data.response?.cEwbNo) {
         allEwbs.push({ ewbNo: res.data.response.cEwbNo });
       }
-      localStorage.setItem(LATEST_EWB_KEY, JSON.stringify({ ...saved, cewbResponse: res.data.response, allEwbs }));
+
+      const updated = {
+        ...saved,
+        cewbResponse: res.data.response,
+        allEwbs,
+      };
+
+      console.log("💾 Saving CEWB:", updated);
+      localStorage.setItem(LATEST_EWB_KEY, JSON.stringify(updated));
     } catch (err) {
+      console.error("❌ API Error:", err);
       setError(err.response?.data?.message || err.message);
       setResponse(err.response?.data || null);
     }
@@ -120,18 +271,21 @@ const CEWBDetails = () => {
     setLoading(false);
   };
 
+  // --------------------------
+  // UI
+  // --------------------------
   return (
     <div style={{ maxWidth: "900px", margin: "auto", padding: "20px", fontFamily: "Arial" }}>
       <h2>Generate Consolidated E-Way Bill (CEWB)</h2>
 
-      {/* Editable Headers */}
-      <div style={{ marginBottom: "20px" }}>
+      {/* Headers */}
+      <div style={{ marginBottom: 20 }}>
         <h3>Headers</h3>
         {Object.entries(headers).map(([key, value]) => (
-          <div key={key} style={{ marginBottom: "5px" }}>
+          <div key={key} style={{ marginBottom: 6 }}>
             <strong>{key}:</strong>
             <input
-              style={{ width: "80%", marginLeft: "10px" }}
+              style={{ width: "80%", marginLeft: 10 }}
               value={value}
               onChange={(e) => handleHeaderChange(key, e.target.value)}
             />
@@ -139,44 +293,40 @@ const CEWBDetails = () => {
         ))}
       </div>
 
-      {/* Editable Payload */}
-      <div style={{ marginBottom: "20px" }}>
+      {/* Payload Editor */}
+      <div style={{ marginBottom: 20 }}>
         <h3>Payload JSON</h3>
         <textarea
           rows={14}
-          style={{ width: "100%", fontFamily: "monospace" }}
           value={payloadText}
+          style={{ width: "100%", fontFamily: "monospace" }}
           onChange={(e) => handlePayloadChange(e.target.value)}
         />
         {error && <p style={{ color: "red" }}>{error}</p>}
       </div>
 
-      <button
-        onClick={handleSubmit}
-        style={{ padding: "10px 20px", cursor: "pointer" }}
-        disabled={loading}
-      >
+      <button onClick={handleSubmit} disabled={loading} style={{ padding: "10px 20px" }}>
         {loading ? "Generating..." : "Generate CEWB"}
       </button>
 
-      {/* Response */}
+      {/* API Response */}
       {response && (
-        <div style={{ marginTop: "20px" }}>
+        <div style={{ marginTop: 20 }}>
           <h3>API Response</h3>
-          <pre style={{ background: "#f5f5f5", padding: "10px", overflow: "auto" }}>
+          <pre style={{ background: "#f5f5f5", padding: 10 }}>
             {JSON.stringify(response, null, 2)}
           </pre>
         </div>
       )}
 
-      {/* Final payload preview */}
-      <div style={{ marginTop: "20px", border: "1px solid #ddd", padding: "10px", borderRadius: "4px" }}>
+      {/* Final Preview */}
+      <div style={{ marginTop: 20, border: "1px solid #ddd", padding: 10, borderRadius: 4 }}>
         <h3>Final Payload</h3>
-        <pre style={{ background: "#f5f5f5", padding: "10px", overflow: "auto" }}>
+        <pre style={{ background: "#f5f5f5", padding: 10 }}>
           {JSON.stringify(payload, null, 2)}
         </pre>
         <h3>Headers</h3>
-        <pre style={{ background: "#f5f5f5", padding: "10px", overflow: "auto" }}>
+        <pre style={{ background: "#f5f5f5", padding: 10 }}>
           {JSON.stringify(headers, null, 2)}
         </pre>
       </div>
