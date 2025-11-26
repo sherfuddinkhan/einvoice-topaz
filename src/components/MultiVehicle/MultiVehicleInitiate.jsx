@@ -1,19 +1,22 @@
-// MultiVehicleInitiate - src/App.js
+// MultiVehicleInitiate.jsx
 import React, { useState, useEffect } from "react";
 import axios from "axios";
 
-export default function MultiVehicleInitiate() {
+const LOGIN_KEY = "iris_login_data";
+const LATEST_EWB_KEY = "latestEwbData";
+
+const MultiVehicleInitiate = () => {
   const [headers, setHeaders] = useState({
-    "X-Auth-Token": localStorage.getItem("token") || "",
-    companyId: localStorage.getItem("companyId") || "",
+    "X-Auth-Token": "",
+    companyId: "",
     product: "TOPAZ",
     "Content-Type": "application/json",
   });
 
   const [payload, setPayload] = useState({
     ewbNo: "",
-    reasonCode: "",
-    reasonRem: "",
+    reasonCode: "1",
+    reasonRem: "Multiple Vehicles",
     fromPlace: "",
     fromState: "",
     toPlace: "",
@@ -28,21 +31,48 @@ export default function MultiVehicleInitiate() {
   const [err, setErr] = useState(null);
   const [loading, setLoading] = useState(false);
 
-  // load previous payload if any
+  // ------------------------
+  // Auto-populate payload
+  // ------------------------
   useEffect(() => {
-    const saved = JSON.parse(localStorage.getItem("mv_initiate_payload") || "{}");
-    setPayload(prev => ({ ...prev, ...saved }));
+    const login = JSON.parse(localStorage.getItem(LOGIN_KEY) || "{}");
+    const latest = JSON.parse(localStorage.getItem(LATEST_EWB_KEY) || "{}");
+
+    if (!latest?.response) return;
+
+    // Headers
+    setHeaders((prev) => ({
+      ...prev,
+      "X-Auth-Token": login?.token || "",
+      companyId: login?.companyId || "",
+    }));
+
+    // Payload
+    const firstItem = latest.response.itemList?.[0] || {};
+    const pf = {
+      ewbNo: latest.ewbNo || "",
+      reasonCode: "1",
+      reasonRem: "Multiple Vehicles",
+      fromPlace: latest.response.fromPlace || "",
+      fromState: latest.response.fromStateCode || "",
+      toPlace: latest.response.toPlace || "",
+      toState: latest.response.toStateCode || "",
+      transMode: latest.response.transMode || "",
+      totalQuantity: firstItem.quantity || "",
+      unitCode: firstItem.qtyUnit || "",
+      userGstin: latest.response.userGstin || "",
+    };
+
+    setPayload((p) => ({ ...p, ...pf }));
   }, []);
 
-  useEffect(() => {
-    localStorage.setItem("mv_initiate_payload", JSON.stringify(payload));
-  }, [payload]);
+  const onHeaderChange = (k, v) =>
+    setHeaders((prev) => ({ ...prev, [k]: v }));
 
-  const onHeaderChange = (k, v) => setHeaders(h => ({ ...h, [k]: v }));
-  const onPayloadChange = (k, v) => setPayload(p => ({ ...p, [k]: v }));
+  const onPayloadChange = (k, v) =>
+    setPayload((prev) => ({ ...prev, [k]: v }));
 
-  const submit = async (e) => {
-    e?.preventDefault();
+  const submit = async () => {
     setLoading(true);
     setErr(null);
     setResp(null);
@@ -65,44 +95,38 @@ export default function MultiVehicleInitiate() {
     <div style={{ padding: 20, maxWidth: 800, margin: "auto" }}>
       <h2>Multi-Vehicle — Initiate</h2>
 
-      <section>
-        <h3>Headers (editable)</h3>
-        {Object.entries(headers).map(([k, v]) => (
-          <div key={k} style={{ marginBottom: 6 }}>
-            <label style={{ width: 130, display: "inline-block" }}>{k}</label>
-            <input
-              style={{ width: 420 }}
-              value={v}
-              onChange={(e) => onHeaderChange(k, e.target.value)}
-            />
-          </div>
-        ))}
-      </section>
+      <h3>Headers</h3>
+      {Object.entries(headers).map(([k, v]) => (
+        <div key={k}>
+          <label style={{ width: 130, display: "inline-block" }}>{k}</label>
+          <input
+            value={v}
+            onChange={(e) => onHeaderChange(k, e.target.value)}
+            style={{ width: 420 }}
+          />
+        </div>
+      ))}
 
-      <section style={{ marginTop: 16 }}>
-        <h3>Payload</h3>
-        {Object.entries(payload).map(([k, v]) => (
-          <div key={k} style={{ marginBottom: 6 }}>
-            <label style={{ width: 140, display: "inline-block" }}>{k}</label>
-            <input
-              style={{ width: 400 }}
-              value={v}
-              onChange={(e) => onPayloadChange(k, e.target.value)}
-            />
-          </div>
-        ))}
-      </section>
+      <h3 style={{ marginTop: 12 }}>Payload</h3>
+      {Object.entries(payload).map(([k, v]) => (
+        <div key={k}>
+          <label style={{ width: 140, display: "inline-block" }}>{k}</label>
+          <input
+            value={v}
+            onChange={(e) => onPayloadChange(k, e.target.value)}
+            style={{ width: 420 }}
+          />
+        </div>
+      ))}
 
-      <div style={{ marginTop: 16 }}>
-        <button onClick={submit} disabled={loading}>
-          {loading ? "Submitting..." : "Submit Initiate"}
-        </button>
-      </div>
+      <button onClick={submit} style={{ marginTop: 15 }}>
+        {loading ? "Submitting..." : "Submit Initiate"}
+      </button>
 
-      <div style={{ marginTop: 16 }}>
-        {err && <pre style={{ color: "red" }}>{JSON.stringify(err, null, 2)}</pre>}
-        {resp && <pre>{JSON.stringify(resp, null, 2)}</pre>}
-      </div>
+      {err && <pre style={{ color: "red" }}>{JSON.stringify(err, null, 2)}</pre>}
+      {resp && <pre>{JSON.stringify(resp, null, 2)}</pre>}
     </div>
   );
-}
+};
+
+export default MultiVehicleInitiate;

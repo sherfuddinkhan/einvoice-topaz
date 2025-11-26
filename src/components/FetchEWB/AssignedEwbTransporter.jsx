@@ -19,14 +19,15 @@ const AssignedEwbTransporter = () => {
 
   const last = JSON.parse(localStorage.getItem(LATEST_EWB_KEY) || "{}");
   const hist = JSON.parse(localStorage.getItem(EWB_HISTORY_KEY) || "{}");
-
+   
   const savedResponse = JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]");
-
-  const initialGstin = last.fromGstin || hist.fromGstin || "";
+  console.log("savedForm",savedForm)
+   console.log("last",last)
+  const initialGstin = last.response.toGstin|| hist.response.toGstin|| "";
 
   // ======================
   // STATES
-  // ======================
+  // ====================== 
   const [form, setForm] = useState({
     date: savedForm.date || "15/11/2025",
     userGstin: initialGstin,

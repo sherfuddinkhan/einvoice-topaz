@@ -1,50 +1,73 @@
-
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 
+const LOGIN_KEY = 'iris_login_data';
+const LATEST_EWB_KEY = 'latestEwbData';
+
 const PrintSummary = () => {
-  const [ewbNos, setEwbNos] = useState([
-    "451177338838",
-    "431177338832",
-    "421177338925",
-    "421177338909",
-    "401177338820",
-    "491177337741",
-    "481177337764",
-    "481177337722",
-    "481177337681",
-    "471177337758"
-  ]);
+  // ----------------------------
+  // State
+  // ----------------------------
+  const [ewbNos, setEwbNos] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [responseMsg, setResponseMsg] = useState('');
-
-  // Headers from local storage
-  const token = localStorage.getItem('token') || '';
-  const companyId = localStorage.getItem('companyId') || '';
-
-  const headersPreview = {
-    "X-Auth-Token": token,
-    companyId,
+  const [headers, setHeaders] = useState({
+    "X-Auth-Token": "",
+    companyId: "",
     product: "TOPAZ",
     "Content-Type": "application/json",
     Accept: "application/pdf"
-  };
+  });
 
+  // ----------------------------
+  // Autopopulate headers and EWB numbers
+  // ----------------------------
+  useEffect(() => {
+    const login = JSON.parse(localStorage.getItem(LOGIN_KEY) || "{}");
+    const latest = JSON.parse(localStorage.getItem(LATEST_EWB_KEY) || "{}");
+
+    // Headers autopopulate
+    setHeaders(prev => ({
+      ...prev,
+      "X-Auth-Token": login?.token || "",
+      companyId: login?.companyId || "",
+    }));
+
+    // EWB numbers autopopulate
+    if (latest?.response?.ewbNo) {
+      // If vehicleDetails exists, map them all; else single EWB
+      const ewbList = latest?.response?.vehicleDetails?.map(v => v.ewbNo) || [latest.response.ewbNo];
+      setEwbNos(ewbList);
+    }
+  }, []);
+
+  // ----------------------------
+  // Payload for API
+  // ----------------------------
   const payloadPreview = { ewbNo: ewbNos };
 
+  // ----------------------------
+  // Submit handler
+  // ----------------------------
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
     setError('');
     setResponseMsg('');
 
+    if (!ewbNos.length || !ewbNos[0]) {
+      setError('No EWB numbers available to print.');
+      setLoading(false);
+      return;
+    }
+
     try {
       const res = await axios.post(
         'http://localhost:3001/proxy/topaz/ewb/printSummary',
         payloadPreview,
         {
-          headers: headersPreview,
+          headers,
           responseType: 'blob'
         }
       );
@@ -61,8 +84,9 @@ const PrintSummary = () => {
       setResponseMsg('PDF downloaded successfully.');
     } catch (err) {
       setError(err.response?.data?.message || 'Failed to print summary');
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   return (
@@ -71,7 +95,7 @@ const PrintSummary = () => {
 
       {/* Headers Preview */}
       <h3>Headers Preview</h3>
-      <pre>{JSON.stringify(headersPreview, null, 2)}</pre>
+      <pre>{JSON.stringify(headers, null, 2)}</pre>
 
       {/* Payload Preview */}
       <h3>Payload Preview</h3>

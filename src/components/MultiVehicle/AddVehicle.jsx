@@ -1,78 +1,150 @@
-// MultiVehicleAdd - src/App.js
 import React, { useState, useEffect } from "react";
 import axios from "axios";
 
-export default function AddVehicle(){
+const LOGIN_KEY = "iris_login_data";
+const MV_INITIATE_KEY = "mv_initiate_response"; // MultiVehicleInitiate response
+const LATEST_EWB_KEY = "latestEwbData";
+
+const AddVehicle = () => {
+  // ------------------------------------------
+  // HEADERS STATE
+  // ------------------------------------------
   const [headers, setHeaders] = useState({
-    "X-Auth-Token": localStorage.getItem("token") || "",
-    companyId: localStorage.getItem("companyId") || "",
+    accept: "application/json",
     product: "TOPAZ",
-    "Content-Type": "application/json",
+    companyid: "",
+    "x-auth-token": "",
   });
 
+  // ------------------------------------------
+  // PAYLOAD STATE
+  // ------------------------------------------
   const [payload, setPayload] = useState({
-    groupNo: "",
+    ewbNo: "",
+    groupNo: "1",
     vehicleNo: "",
-    quantity: "",
+    fromPlace: "",
+    fromState: "",
+    reasonCode: "1",
+    reasonDesc: "Multiple Vehicles",
     transDocNo: "",
     transDocDate: "",
-    userGstin: ""
+    transMode: "",
+    quantity: "",
+    userGstin: "",
+    validUpto: "",
   });
 
   const [resp, setResp] = useState(null);
   const [err, setErr] = useState(null);
-  const [loading, setLoading] = useState(false);
 
-  useEffect(()=> {
-    const saved = JSON.parse(localStorage.getItem("mv_add_payload") || "{}");
-    setPayload(p => ({...p, ...saved}));
-  },[]);
+  // ========================================================================
+  // AUTO-POPULATE HEADERS + PAYLOAD FROM LOCALSTORAGE
+  // ========================================================================
+  useEffect(() => {
+    const login = JSON.parse(localStorage.getItem(LOGIN_KEY) || "{}");
+    const initResp = JSON.parse(localStorage.getItem(MV_INITIATE_KEY) || "{}");
+    const latest = JSON.parse(localStorage.getItem(LATEST_EWB_KEY) || "{}");
 
-  useEffect(()=> localStorage.setItem("mv_add_payload", JSON.stringify(payload)), [payload]);
+    // 1️⃣ Headers
+    setHeaders({
+      accept: "application/json",
+      product: "TOPAZ",
+      companyid: login?.companyId || initResp?.response?.companyId || "",
+      "x-auth-token": login?.token || "",
+    });
 
-  const onH=(k,v)=> setHeaders(h=>({...h,[k]:v}));
-  const onP=(k,v)=> setPayload(p=>({...p,[k]:v}));
+    // 2️⃣ Auto-fill payload
+    const vehicleDetails = latest?.response?.vehicleDetails?.[0] || {};
+    const itemList = latest?.response?.itemList?.[0] || {};
 
+    setPayload({
+      ewbNo: initResp?.response?.ewbNo || latest?.response?.ewbNo || "",
+      groupNo: initResp?.response?.groupNo || "1",
+      vehicleNo: vehicleDetails.vehicleNo || "",
+      fromPlace: vehicleDetails.fromPlace || initResp?.response?.fromPlace || "",
+      fromState: vehicleDetails.fromState || initResp?.response?.fromState || "",
+      reasonCode: initResp?.response?.reasonCode || "1",
+      reasonDesc: initResp?.response?.reasonRem || "Multiple Vehicles",
+      transDocNo: vehicleDetails.transDocNo || latest?.response?.transDocNo || "",
+      transDocDate: vehicleDetails.transDocDate || latest?.response?.transDocDate || "",
+      transMode: vehicleDetails.transMode || latest?.response?.transMode || "",
+      quantity: initResp?.response?.totalQuantity || itemList.quantity || "",
+      userGstin: initResp?.response?.reqGstin || latest?.response?.userGstin || "",
+      validUpto: latest?.response?.validUpto || "",
+    });
+  }, []);
+
+  // ========================================================================
+  // PAYLOAD UPDATE HANDLER
+  // ========================================================================
+  const onP = (key, value) =>
+    setPayload((prev) => ({ ...prev, [key]: value }));
+
+  // ========================================================================
+  // SUBMIT REQUEST
+  // ========================================================================
   const submit = async () => {
-    setLoading(true); setErr(null); setResp(null);
+    setErr(null);
+    setResp(null);
+
     try {
-      const res = await axios.post("http://localhost:3001/proxy/topaz/multiVehicle/add", payload, { headers });
+      const res = await axios.post(
+        "http://localhost:3001/proxy/topaz/multiVehicle/add",
+        payload,
+        { headers }
+      );
       setResp(res.data);
-    } catch(e){
-      setErr(e.response?.data||e.message);
-    } finally { setLoading(false);}
+    } catch (e) {
+      setErr(e.response?.data || e.message);
+    }
   };
 
+  // ========================================================================
+  // UI
+  // ========================================================================
   return (
-    <div style={{padding:20, maxWidth:800, margin:"auto"}}>
+    <div style={{ padding: 20, maxWidth: 800, margin: "auto" }}>
       <h2>Multi-Vehicle — Add Vehicle</h2>
 
-      <div>
-        <h3>Headers</h3>
-        {Object.entries(headers).map(([k,v])=>(
-          <div key={k}><label style={{width:140, display:"inline-block"}}>{k}</label>
-            <input style={{width:420}} value={v} onChange={e=>onH(k,e.target.value)} />
-          </div>
-        ))}
-      </div>
+      {/* HEADERS */}
+      <h3>Headers</h3>
+      {Object.entries(headers).map(([k, v]) => (
+        <div key={k} style={{ marginBottom: 6 }}>
+          <label style={{ width: 150, display: "inline-block" }}>{k}</label>
+          <input
+            value={v}
+            onChange={(e) =>
+              setHeaders((prev) => ({ ...prev, [k]: e.target.value }))
+            }
+            style={{ width: 430 }}
+          />
+        </div>
+      ))}
 
-      <div style={{marginTop:12}}>
-        <h3>Payload</h3>
-        {Object.entries(payload).map(([k,v])=>(
-          <div key={k}><label style={{width:140, display:"inline-block"}}>{k}</label>
-            <input style={{width:420}} value={v} onChange={e=>onP(k,e.target.value)} />
-          </div>
-        ))}
-      </div>
+      {/* PAYLOAD */}
+      <h3 style={{ marginTop: 12 }}>Payload</h3>
+      {Object.entries(payload).map(([k, v]) => (
+        <div key={k} style={{ marginBottom: 6 }}>
+          <label style={{ width: 150, display: "inline-block" }}>{k}</label>
+          <input
+            value={v}
+            onChange={(e) => onP(k, e.target.value)}
+            style={{ width: 430 }}
+          />
+        </div>
+      ))}
 
-      <div style={{marginTop:12}}>
-        <button onClick={submit} disabled={loading}>{loading?"Processing...":"Submit Add"}</button>
-      </div>
+      {/* BUTTON */}
+      <button onClick={submit} style={{ marginTop: 15 }}>
+        Submit Add Vehicle
+      </button>
 
-      <div style={{marginTop:12}}>
-        {err && <pre style={{color:"red"}}>{JSON.stringify(err,null,2)}</pre>}
-        {resp && <pre>{JSON.stringify(resp,null,2)}</pre>}
-      </div>
+      {/* RESPONSES */}
+      {err && <pre style={{ color: "red" }}>{JSON.stringify(err, null, 2)}</pre>}
+      {resp && <pre>{JSON.stringify(resp, null, 2)}</pre>}
     </div>
   );
-}
+};
+
+export default AddVehicle;
