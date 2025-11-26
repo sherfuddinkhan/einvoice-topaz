@@ -1,122 +1,222 @@
-import React, { useState } from "react";
-import axios from "axios";
+// BusinessHierarchyForm.js
+import React, { useState, useEffect } from "react";
 
+const STORAGE_KEY = "iris_einvoice_shared_config";
+const LOGIN_RESPONSE_KEY = "iris_login_data";
+const login = JSON.parse(localStorage.getItem(LOGIN_RESPONSE_KEY) || "{}");
 const BusinessHierarchy = () => {
-  const [hierarchy, setHierarchy] = useState([]);
+  const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || "{}");
+
+  const [config, setConfig] = useState({
+    proxyBase: "http://localhost:3001/proxy",
+    endpoint: "/mgmt/businessHierarchy", // <-- proxy endpoint
+
+    headers: {
+      Accept: "application/json",
+      companyId: login?.companyId || saved?.companyId || "",
+      "X-Auth-Token": login.token || saved?.token || "",
+      product: "TOPAZ",
+    },
+    queryCompanyId: login?.companyId || saved?.companyId || "",
+  });
+
+  const [rawResponse, setRawResponse] = useState(null);
+  const [businessData, setBusinessData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
-  // Editable headers & query params
-  const [headers, setHeaders] = useState({
-    "X-Auth-Token": localStorage.getItem("token") || "",
-    companyId: localStorage.getItem("companyId") || "",
-    product: "topaz",
-    Accept: "application/json",
-  });
+  // Auto-save headers to localStorage
+  useEffect(() => {
+    localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({
+        companyId: config.headers.companyId,
+        token: config.headers["X-Auth-Token"],
+      })
+    );
+  }, [config]);
 
-  const [queryParams, setQueryParams] = useState({
-    companyid: localStorage.getItem("companyId") || "",
-  });
+  const updateHeader = (key, value) =>
+    setConfig((prev) => ({
+      ...prev,
+      headers: { ...prev.headers, [key]: value },
+    }));
 
-  const handleHeaderChange = (e) => {
-    setHeaders({ ...headers, [e.target.name]: e.target.value });
-  };
+  const updateQuery = (value) =>
+    setConfig((prev) => ({ ...prev, queryCompanyId: value }));
 
-  const handleParamChange = (e) => {
-    setQueryParams({ ...queryParams, [e.target.name]: e.target.value });
-  };
-
-  const fetchHierarchy = async () => {
+  // API call via proxy
+  const sendRequest = async () => {
     setLoading(true);
     setError("");
+    setBusinessData(null);
+    setRawResponse(null);
+
+    const finalURL = `${config.proxyBase}${config.endpoint}?companyid=${config.queryCompanyId}`;
+
     try {
-      const res = await axios.get("http://localhost:3001/proxy/mgmt/businessHierarchy", {
-        headers,
-        params: queryParams,
+      const res = await fetch(finalURL, {
+        method: "GET",
+        headers: config.headers,
       });
-      setHierarchy(res.data.response || []);
+
+      const text = await res.text();
+      let json = null;
+      try {
+        json = JSON.parse(text);
+      } catch (_) {}
+
+      setRawResponse({
+        status: res.status,
+        statusText: res.statusText,
+        headers: Object.fromEntries(res.headers.entries()),
+        body: json || text,
+        time: new Date().toLocaleString("en-IN", { timeZone: "Asia/Kolkata" }),
+      });
+
+      if (res.ok && json?.status === "SUCCESS") {
+        setBusinessData(json.response);
+      } else {
+        setError(json?.message || "Invalid Response");
+      }
     } catch (err) {
-      console.error(err);
-      setError(err.response?.data?.message || "Fetch failed");
+      setError(err.message || "Request Failed");
     } finally {
       setLoading(false);
     }
   };
 
-  return (
-    <div style={{ maxWidth: "800px", margin: "auto" }}>
-      <h2>Business Hierarchy</h2>
+  const finalURL = `${config.proxyBase}${config.endpoint}?companyid=${config.queryCompanyId}`;
 
-      <div style={{ border: "1px solid #ccc", padding: "10px", marginBottom: "20px" }}>
-        <h4>Headers (editable)</h4>
-        {Object.keys(headers).map((key) => (
-          <div key={key} style={{ marginBottom: "5px" }}>
-            <label style={{ marginRight: "10px" }}>{key}:</label>
-            <input
-              type="text"
-              name={key}
-              value={headers[key]}
-              onChange={handleHeaderChange}
-              style={{ width: "300px" }}
-            />
-          </div>
-        ))}
+  const renderCompanyNode = (company) => (
+    <li style={{ margin: "10px 0" }}>
+      <div style={{ fontWeight: "bold" }}>
+        {company.companyName} ({company.entityType})
       </div>
+      <div>Company ID: {company.companyId}</div>
+      {company.gstin && <div>GSTIN: {company.gstin}</div>}
+      {company.pobCode && <div>POB Code: {company.pobCode}</div>}
+      {company.childCompanies && company.childCompanies.length > 0 && (
+        <ul style={{ marginLeft: 20 }}>
+          {company.childCompanies.map((child) => renderCompanyNode(child))}
+        </ul>
+      )}
+    </li>
+  );
 
-      <div style={{ border: "1px solid #ccc", padding: "10px", marginBottom: "20px" }}>
-        <h4>Query Params (editable)</h4>
-        {Object.keys(queryParams).map((key) => (
-          <div key={key} style={{ marginBottom: "5px" }}>
-            <label style={{ marginRight: "10px" }}>{key}:</label>
+  return (
+    <div style={{ padding: 30, fontFamily: "Arial", background: "#f4f4f4" }}>
+      <div style={{ background: "white", padding: 20, borderRadius: 10 }}>
+        <h2>Business Hierarchy (Debug Panel)</h2>
+
+        <b>Request URL:</b>
+        <div
+          style={{
+            background: "#eee",
+            padding: 10,
+            fontFamily: "monospace",
+            marginTop: 6,
+            borderRadius: 6,
+          }}
+        >
+          {finalURL}
+        </div>
+
+        <h3>Query Parameter</h3>
+        <label>companyid (query):</label>
+        <input
+          value={config.queryCompanyId}
+          onChange={(e) => updateQuery(e.target.value)}
+          style={{ padding: 8, marginLeft: 10, width: 200 }}
+        />
+
+        <h3>Headers</h3>
+        {Object.entries(config.headers).map(([key, value]) => (
+          <div key={key} style={{ marginBottom: 10 }}>
+            <label
+              style={{
+                width: 140,
+                display: "inline-block",
+                fontWeight: "bold",
+              }}
+            >
+              {key}:
+            </label>
             <input
-              type="text"
-              name={key}
-              value={queryParams[key]}
-              onChange={handleParamChange}
-              style={{ width: "300px" }}
+              type={key === "X-Auth-Token" ? "password" : "text"}
+              value={value}
+              onChange={(e) => updateHeader(key, e.target.value)}
+              style={{ width: 300, padding: 8 }}
             />
           </div>
         ))}
+
         <button
-          onClick={() => setQueryParams({ ...queryParams, newParam: "" })}
-          style={{ marginTop: "5px" }}
+          onClick={sendRequest}
+          disabled={loading}
+          style={{
+            padding: "10px 20px",
+            background: "#2196f3",
+            color: "white",
+            border: "none",
+            borderRadius: 8,
+            marginTop: 10,
+          }}
         >
-          Add Param
+          {loading ? "Loading..." : "Send Request"}
         </button>
       </div>
 
-      <button onClick={fetchHierarchy} disabled={loading} style={{ marginBottom: "20px" }}>
-        {loading ? "Fetching..." : "Fetch Hierarchy"}
-      </button>
-
-      {error && (
-        <div style={{ background: "#ffe6e6", padding: "10px", marginBottom: "10px" }}>
-          <h4>Error:</h4>
-          <pre>{error}</pre>
+      {rawResponse && (
+        <div
+          style={{
+            background: "#fff8e1",
+            padding: 20,
+            marginTop: 20,
+            borderRadius: 10,
+          }}
+        >
+          <h3>Raw Response</h3>
+          <pre
+            style={{
+              background: "#222",
+              color: "#0f0",
+              padding: 15,
+              borderRadius: 6,
+              maxHeight: 400,
+              overflow: "auto",
+            }}
+          >
+            {JSON.stringify(rawResponse, null, 2)}
+          </pre>
         </div>
       )}
 
-      {hierarchy.length > 0 ? (
-        <table style={{ width: "100%", borderCollapse: "collapse" }}>
-          <thead>
-            <tr>
-              <th>Company Name</th>
-              <th>GSTIN</th>
-              <th>Role</th>
-            </tr>
-          </thead>
-          <tbody>
-            {hierarchy.map((item) => (
-              <tr key={item.id}>
-                <td>{item.companyname}</td>
-                <td>{item.gstin}</td>
-                <td>{item.roleName}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      ) : (
-        !loading && <p>No business hierarchy found.</p>
+      {error && (
+        <div
+          style={{
+            background: "#ffcdd2",
+            padding: 12,
+            marginTop: 20,
+            color: "#b71c1c",
+          }}
+        >
+          {error}
+        </div>
+      )}
+
+      {businessData && (
+        <div
+          style={{
+            background: "white",
+            padding: 20,
+            marginTop: 20,
+            borderRadius: 10,
+          }}
+        >
+          <h3>Business Hierarchy Tree</h3>
+          <ul>{renderCompanyNode(businessData)}</ul>
+        </div>
       )}
     </div>
   );

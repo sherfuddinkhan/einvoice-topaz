@@ -1,130 +1,153 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import axios from "axios";
 
+const STORAGE_KEY = "iris_einvoice_shared_config";
+const LOGIN_RESPONSE_KEY = "iris_login_data";
+
 const AssignedPOB = () => {
-  const [pobs, setPobs] = useState([]);
+  const savedConfig = JSON.parse(localStorage.getItem(LOGIN_RESPONSE_KEY) || "{}");
+
+  const [config, setConfig] = useState({
+    proxyBase: "http://localhost:3001/proxy",
+    endpoint: "/mgmt/pob/list", // ✔ correct proxy path
+
+    headers: {
+      Accept: "application/json",
+      companyId: savedConfig?.companyId || savedConfig?.companyId || "",
+      "X-Auth-Token":
+        savedConfig?.token || savedConfig?.token || "",
+      product: "TOPAZ",
+    },
+
+    queryCompanyId:
+     savedConfig?.companyId || savedConfig?.companyId || "",
+  });
+
+  const [pobList, setPobList] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [rawResponse, setRawResponse] = useState(null);
 
-  // Editable headers & query params
-  const [headers, setHeaders] = useState({
-    Accept: "application/json",
-    "X-Auth-Token": localStorage.getItem("token") || "",
-    companyId: localStorage.getItem("companyId") || "",
-    product: "topaz",
-  });
+  // Save companyId & token automatically
+  useEffect(() => {
+    localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({
+        companyId: config.headers.companyId,
+        token: config.headers["X-Auth-Token"],
+      })
+    );
+  }, [config.headers]);
 
-  const [queryParams, setQueryParams] = useState({
-    companyId: localStorage.getItem("companyId") || "",
-  });
-
-  const handleHeaderChange = (e) => {
-    setHeaders({ ...headers, [e.target.name]: e.target.value });
+  const updateHeader = (key, value) => {
+    setConfig((prev) => ({
+      ...prev,
+      headers: { ...prev.headers, [key]: value },
+    }));
   };
 
-  const handleParamChange = (e) => {
-    setQueryParams({ ...queryParams, [e.target.name]: e.target.value });
+  const updateQuery = (value) => {
+    setConfig((prev) => ({ ...prev, queryCompanyId: value }));
   };
 
-  const fetchPOBs = async () => {
+  const fetchPOBList = async () => {
+    if (!config.queryCompanyId) {
+      setError("Company ID is required");
+      return;
+    }
+
     setLoading(true);
     setError("");
+    setPobList([]);
+    setRawResponse(null);
+
+    const finalURL = `${config.proxyBase}${config.endpoint}?companyId=${config.queryCompanyId}`;
+
     try {
-      const res = await axios.get("http://localhost:3001/topaz/pob/assigned", {
-        headers,
-        params: queryParams,
+      const res = await axios.get(finalURL, {
+        headers: config.headers,
       });
-      setPobs(res.data.response || []);
+
+      setRawResponse(res.data);
+
+      if (res.data.status === "SUCCESS" && Array.isArray(res.data.response)) {
+        setPobList(res.data.response);
+      } else {
+        setError("Failed to fetch assigned places of business");
+      }
     } catch (err) {
-      console.error(err);
-      setError(err.response?.data?.message || "Fetch failed");
+      setError(err.message || "Request failed");
+      setRawResponse(err.response?.data || null);
     } finally {
       setLoading(false);
     }
   };
 
+  const finalURL = `${config.proxyBase}${config.endpoint}?companyId=${config.queryCompanyId}`;
+
   return (
-    <div style={{ maxWidth: "900px", margin: "auto" }}>
-      <h2>Assigned Places of Business</h2>
+    <div style={{ padding: 20 }}>
+      <h2>Assigned Place of Businesses</h2>
 
-      {/* Editable Headers */}
-      <div style={{ border: "1px solid #ccc", padding: "10px", marginBottom: "20px" }}>
-        <h4>Headers (editable)</h4>
-        {Object.keys(headers).map((key) => (
-          <div key={key} style={{ marginBottom: "5px" }}>
-            <label style={{ marginRight: "10px" }}>{key}:</label>
-            <input
-              type="text"
-              name={key}
-              value={headers[key]}
-              onChange={handleHeaderChange}
-              style={{ width: "300px" }}
-            />
-          </div>
-        ))}
+      <div>
+        <label>Query Param (companyId):</label>
+        <input
+          value={config.queryCompanyId}
+          onChange={(e) => updateQuery(e.target.value)}
+          style={{ padding: 6, marginLeft: 10 }}
+        />
       </div>
 
-      {/* Editable Query Params */}
-      <div style={{ border: "1px solid #ccc", padding: "10px", marginBottom: "20px" }}>
-        <h4>Query Params (editable)</h4>
-        {Object.keys(queryParams).map((key) => (
-          <div key={key} style={{ marginBottom: "5px" }}>
-            <label style={{ marginRight: "10px" }}>{key}:</label>
-            <input
-              type="text"
-              name={key}
-              value={queryParams[key]}
-              onChange={handleParamChange}
-              style={{ width: "300px" }}
-            />
-          </div>
-        ))}
-        <button
-          onClick={() => setQueryParams({ ...queryParams, newParam: "" })}
-          style={{ marginTop: "5px" }}
-        >
-          Add Param
-        </button>
-      </div>
+      <h3>Headers (Editable)</h3>
+      {Object.entries(config.headers).map(([key, value]) => (
+        <div key={key} style={{ marginBottom: 10 }}>
+          <label style={{ width: 140, display: "inline-block" }}>
+            {key}:
+          </label>
+          <input
+            type={key === "X-Auth-Token" ? "password" : "text"}
+            value={value}
+            onChange={(e) => updateHeader(key, e.target.value)}
+            style={{ padding: 6, width: 300 }}
+          />
+        </div>
+      ))}
 
-      <button onClick={fetchPOBs} disabled={loading} style={{ marginBottom: "20px" }}>
-        {loading ? "Fetching..." : "Fetch Assigned POBs"}
+      <button
+        onClick={fetchPOBList}
+        disabled={loading}
+        style={{ padding: "8px 16px", marginTop: 10 }}
+      >
+        {loading ? "Loading..." : "Fetch POBs"}
       </button>
 
-      {/* Error Display */}
-      {error && (
-        <div style={{ background: "#ffe6e6", padding: "10px", marginBottom: "10px" }}>
-          <strong>Error:</strong> {error}
+      {error && <div style={{ color: "red", marginTop: 10 }}>{error}</div>}
+
+      {pobList.length > 0 && (
+        <div style={{ marginTop: 20 }}>
+          <h3>POB List ({pobList.length})</h3>
+          <ul>
+            {pobList.map((pob, index) => (
+              <li key={index}>
+                {pob.companyName} ({pob.cmpPincode})
+              </li>
+            ))}
+          </ul>
         </div>
       )}
 
-      {/* POB Table */}
-      {pobs.length > 0 ? (
-        <table style={{ width: "100%", borderCollapse: "collapse", textAlign: "left" }}>
-          <thead style={{ background: "#f0f0f0" }}>
-            <tr>
-              <th>Company Name</th>
-              <th>GSTIN</th>
-              <th>Pincode</th>
-              <th>State Code</th>
-              <th>Principal?</th>
-            </tr>
-          </thead>
-          <tbody>
-            {pobs.map((pob) => (
-              <tr key={pob.companyId}>
-                <td>{pob.companyName}</td>
-                <td>{pob.gstin || pob.gstinno}</td>
-                <td>{pob.cmpPincode}</td>
-                <td>{pob.stateCode}</td>
-                <td>{pob.isPrincipalPob ? "Yes" : "No"}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      ) : (
-        !loading && <p>No assigned POBs found.</p>
+      {rawResponse && (
+        <div style={{ marginTop: 20 }}>
+          <h3>Raw Response</h3>
+          <pre style={{ background: "#eee", padding: 10 }}>
+            {JSON.stringify(rawResponse, null, 2)}
+          </pre>
+        </div>
       )}
+
+      <div style={{ marginTop: 10, fontSize: 12, color: "#666" }}>
+        Request URL: {finalURL}
+      </div>
     </div>
   );
 };

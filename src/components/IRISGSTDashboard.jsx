@@ -10,12 +10,13 @@ import GetEwbDetails from "./EwaybillCore/GetEwbDetails";
 import GenerateEwb from "./EwaybillCore/GenerateEwb"; // CASE FIXED
 
 // --- EWAYBILL ACTIONS ---
-import FetchTransporterEwb from "./EwaybillActions/FetchTransporterEwb";
+import UpdateTransporterId from "./EwaybillActions/UpdateTransporterId";
 import UpdateCancelEwb from "./EwaybillActions/UpdateCancelEwb"; // CASE FIXED
 
 // --- FETCH EWAYBILL ---
-import FetchGeneratedEWB from "./FetchEWB/FetchGeneratedEWB";
+import FetchByDate from "./FetchEWB/FetchByDate";
 import FetchOtherParties from "./FetchEWB/FetchOtherParties";
+import AssignedEwbTransporter from "./FetchEWB/AssignedEwbTransporter";
 
 // --- CONSOLIDATE EWAYBILL ---
 import CEWBDetails from "./ConsolidateEWB/CEWBDetails";   // FIXED PATH
@@ -83,7 +84,7 @@ const IRISGSTDashboard = () => {
     "update-transporter": "Update Transporter",
     "ewb-by-date": "Fetch EWB by Date",
     "ewb-other-parties": "Fetch Other Parties",
-    "ewb-transporter-assigned": "Transporter Assigned",
+    "ewb-transporter-assigned": "AssignedEWBTransporter",
     "cewb-details": "CEWB Details",
     "cewb-generate": "Generate CEWB",
     "ewb-by-doc-type": "EWB by Doc Type",
@@ -154,7 +155,7 @@ const IRISGSTDashboard = () => {
       />
     ),
     "update-transporter": (
-      <UpdateCancelEwb
+      <UpdateTransporterId
         shared={sharedData}
         updateShared={updateSharedData}
         setActiveTab={setActiveTab}
@@ -163,7 +164,7 @@ const IRISGSTDashboard = () => {
 
     // FETCH EWAYBILL
     "ewb-by-date": (
-      <FetchEWBByDate
+      <FetchByDate
         shared={sharedData}
         updateShared={updateSharedData}
         setActiveTab={setActiveTab}
@@ -177,7 +178,7 @@ const IRISGSTDashboard = () => {
       />
     ),
     "ewb-transporter-assigned": (
-      <FetchTransporterEwb
+      <AssignedEwbTransporter
         shared={sharedData}
         updateShared={updateSharedData}
         setActiveTab={setActiveTab}

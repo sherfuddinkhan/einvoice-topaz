@@ -266,21 +266,28 @@ app.post("/proxy/topaz/ewb/printSummary", (req, res) => printEWB("/irisgst/topaz
    ====================================================================== */
 // -----------------------------
 // -----------------------------
-// GET: Business Hierarchy
+                   // GET: Business Hierarchy
 
 // =====================
-app.put('/proxy/mgmt/business/add', (req, res) => {
+// FINAL CORRECT SERVER ROUTE
+app.put('/proxy/mgmt/company/business', (req, res) => {
   proxyRequest(res, () =>
-    axios.put(`${BASE_URL}/mgmt/company/business`, req.body, {
-      headers: {
-        'Content-Type': 'application/json',
-        Accept: 'application/json',
-        product: 'ONYX',
-        ...authHeaders(req),
-      },
-    })
+    axios.put(
+      `${BASE_URL}/mgmt/company/business`,
+      req.body,
+      {
+        headers: {
+          'Content-Type': 'application/json',
+          Accept: 'application/json',
+          product: 'TOPAZ',
+          ...authHeaders(req),
+        },
+      }
+    )
   );
 });
+
+
 
 // =====================
 // Get Business Hierarchy
@@ -291,7 +298,7 @@ app.get('/proxy/mgmt/businessHierarchy', (req, res) => {
       params: req.query,
       headers: {
         Accept: 'application/json',
-        product: 'ONYX',
+        product: 'TOPAZ',
         ...authHeaders(req),
       },
     })
@@ -313,7 +320,7 @@ app.get('/proxy/mgmt/pob/list', (req, res) => {
 // =====================
 // Get Assigned GSTINs for Filing Business
 // =====================
-app.get('/proxy/mgmt/gstin/list', (req, res) => {
+app.get('/proxy/mgmt/user/company/filingbusiness', (req, res) => {
   proxyRequest(res, () =>
     axios.get(`${BASE_URL}/mgmt/user/company/filingbusiness`, {
       params: req.query,

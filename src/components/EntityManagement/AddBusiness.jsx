@@ -1,172 +1,127 @@
-import React, { useState } from 'react';
-import axios from 'axios';
+import React, { useState } from "react";
+import axios from "axios";
+
+const STORAGE_KEY = "iris_einvoice_shared_config";
+const LOGIN_RESPONSE_KEY = "iris_login_data";
 
 const AddBusiness = () => {
+  const savedConfig = JSON.parse(localStorage.getItem(STORAGE_KEY) || "{}");
+  const login = JSON.parse(localStorage.getItem(LOGIN_RESPONSE_KEY) || "{}");
+
+  const companyId = login?.companyId || savedConfig?.companyId || "";
+  const token = login?.token || savedConfig?.token || "";
+
   const [formData, setFormData] = useState({
-    companyname: '',
-    roleName: 'Admin',
-    id: '',
-    gstinno: '',
-    parentid: '',
-    state: '',
-    entitytype: 'BUSINESS',
-    address: '',
-    pincode: ''
+    companyname: "",
+    roleName: "Admin",
+    id: "",
+    gstinno: "",
+    parentid: companyId,
+    state: "1",
+    PAN: "",
+    entitytype: "FILING",
+    address: "",
+    pincode: "",
   });
 
+  const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
-  const [response, setResponse] = useState(null);
 
-  // Handle form input change
+  const headers = {
+    Accept: "application/json",
+    product: "TOPAZ",
+    "Content-Type": "application/json",
+    companyId: companyId,
+    "X-Auth-Token": token,
+  };
+
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
-  // Handle form submission
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+  const addBusiness = async () => {
     setLoading(true);
-    setError('');
-    setResponse(null);
+    setResult(null);
 
     try {
-      const token = localStorage.getItem('token');
-      const companyId = localStorage.getItem('companyId');
-
-      const headers = {
-        'Accept': 'application/json',
-        'Content-Type': 'application/json',
-        'X-Auth-Token': token,
-        'companyId': companyId,
-        product: 'ONYX'
-      };
-
-      console.log('Request Headers:', headers);
-      console.log('Request Payload:', formData);
-
-      const res = await axios.put(
-        'http://localhost:3001/proxy/topaz/mgmt/company/business',
+      const response = await axios.put(
+        "http://localhost:3001/proxy/mgmt/company/business",
         formData,
         { headers }
       );
-
-      setResponse(res.data);
-    } catch (err) {
-      setError(err.response?.data?.message || 'Add failed');
+      setResult(response.data);
+    } catch (error) {
+      setResult(error.response?.data || { error: "Request failed" });
+    } finally {
+      setLoading(false);
     }
-
-    setLoading(false);
   };
 
   return (
-    <div style={{ maxWidth: '700px', margin: 'auto', padding: 20 }}>
-      <h2>Add Business / Entity (Root / Legal / Filing / Business)</h2>
+    <div style={{ padding: 20 }}>
+      <h2>Add Business</h2>
 
-      <form onSubmit={handleSubmit} style={{ marginBottom: 20 }}>
-        <input
-          name="companyname"
-          placeholder="Company Name"
-          value={formData.companyname}
-          onChange={handleChange}
-          required
-        />
-        <input
-          name="roleName"
-          placeholder="Role Name"
-          value={formData.roleName}
-          onChange={handleChange}
-          required
-        />
-        <input
-          name="id"
-          placeholder="ID (optional)"
-          value={formData.id}
-          onChange={handleChange}
-        />
-        <input
-          name="gstinno"
-          placeholder="GSTIN No"
-          value={formData.gstinno}
-          onChange={handleChange}
-          required
-        />
-        <input
-          name="parentid"
-          placeholder="Parent ID"
-          value={formData.parentid}
-          onChange={handleChange}
-          required
-        />
-        <input
-          name="state"
-          placeholder="State Code"
-          value={formData.state}
-          onChange={handleChange}
-          required
-        />
-        <select
-          name="entitytype"
-          value={formData.entitytype}
-          onChange={handleChange}
-        >
-          <option value="BUSINESS">BUSINESS</option>
-          <option value="ROOT">ROOT</option>
-          <option value="LEGAL">LEGAL</option>
-          <option value="FILING">FILING</option>
-        </select>
-        <input
-          name="address"
-          placeholder="Address"
-          value={formData.address}
-          onChange={handleChange}
-          required
-        />
-        <input
-          name="pincode"
-          placeholder="Pincode"
-          value={formData.pincode}
-          onChange={handleChange}
-          required
-        />
-
-        <button type="submit" disabled={loading} style={{ marginTop: 10 }}>
-          {loading ? 'Adding...' : 'Add Entity'}
-        </button>
-      </form>
-
-      {/* Display Headers */}
-      <div style={{ background: '#f0f0f0', padding: 10, marginBottom: 10 }}>
-        <h4>Request Headers</h4>
-        <pre>{JSON.stringify({
-          'Accept': 'application/json',
-          'Content-Type': 'application/json',
-          'X-Auth-Token': localStorage.getItem('token'),
-          'companyId': localStorage.getItem('companyId'),
-          product: 'ONYX'
-        }, null, 2)}</pre>
+      <div><label>Company Name:</label>
+        <input name="companyname" value={formData.companyname} onChange={handleChange} />
       </div>
 
-      {/* Display Payload */}
-      <div style={{ background: '#f9f9f9', padding: 10, marginBottom: 10 }}>
-        <h4>Request Payload</h4>
-        <pre>{JSON.stringify(formData, null, 2)}</pre>
+      <div><label>Role Name:</label>
+        <input name="roleName" value={formData.roleName} onChange={handleChange} />
       </div>
 
-      {/* Display API Response */}
-      {response && (
-        <div style={{ background: '#e6ffe6', padding: 10, marginTop: 10 }}>
-          <h4>API Response</h4>
-          <pre>{JSON.stringify(response, null, 2)}</pre>
-        </div>
-      )}
+      <div><label>ID:</label>
+        <input name="id" value={formData.id} onChange={handleChange} />
+      </div>
 
-      {/* Display Error */}
-      {error && (
-        <div style={{ background: '#ffe6e6', padding: 10, marginTop: 10 }}>
-          <h4>Error</h4>
-          <pre>{error}</pre>
-        </div>
+      <div><label>GSTIN No:</label>
+        <input name="gstinno" value={formData.gstinno} onChange={handleChange} />
+      </div>
+
+      <div><label>PAN:</label>
+        <input name="PAN" value={formData.PAN} onChange={handleChange} />
+      </div>
+
+      <div><label>Parent ID:</label>
+        <input name="parentid" value={formData.parentid} onChange={handleChange} />
+      </div>
+
+      <div><label>State:</label>
+        <input name="state" value={formData.state} onChange={handleChange} />
+      </div>
+
+      <div><label>Entity Type:</label>
+        <input name="entitytype" value={formData.entitytype} onChange={handleChange} />
+      </div>
+
+      <div><label>Address:</label>
+        <input name="address" value={formData.address} onChange={handleChange} />
+      </div>
+
+      <div><label>Pincode:</label>
+        <input name="pincode" value={formData.pincode} onChange={handleChange} />
+      </div>
+
+      <button onClick={addBusiness} disabled={loading}>
+        {loading ? "Adding..." : "Add Business"}
+      </button>
+
+      <h3>Headers:</h3>
+      <pre style={{ background: "#222", color: "#0f0", padding: 10 }}>
+        {JSON.stringify(headers, null, 2)}
+      </pre>
+
+      <h3>Payload:</h3>
+      <pre style={{ background: "#111", color: "#0ff", padding: 10 }}>
+        {JSON.stringify(formData, null, 2)}
+      </pre>
+
+      {result && (
+        <>
+          <h3>Response:</h3>
+          <pre style={{ background: "#000", color: "#fff", padding: 10 }}>
+            {JSON.stringify(result, null, 2)}
+          </pre>
+        </>
       )}
     </div>
   );
