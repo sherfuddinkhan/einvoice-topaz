@@ -1,223 +1,216 @@
 import React, { useState, useEffect } from "react";
 import axios from "axios";
 
+// ---------------------------
+// LocalStorage Keys
+// ---------------------------
 const LOGIN_RESPONSE_KEY = "iris_login_data";
 const LATEST_EWB_KEY = "latestEwbData";
 const EWB_HISTORY_KEY = "ewbHistory";
 const STORAGE_KEY = "EWB_PREVIOUS_DATA";
 
+// ---------------------------
+// Safe JSON Helper
+// ---------------------------
+const getJson = (key) => {
+  try {
+    return JSON.parse(localStorage.getItem(key)) || null;
+  } catch {
+    return null;
+  }
+};
+
 const FetchByDocNumType = () => {
-  // -----------------------------
-  // UTIL: SAFE LOCALSTORAGE READ
-  // -----------------------------
-  const getJson = (key) => {
-    try {
-      return JSON.parse(localStorage.getItem(key) || "{}");
-    } catch {
-      return {};
-    }
-  };
+  // ---------------------------
+  // Load Local Data
+  // ---------------------------
+  const loginData = getJson(LOGIN_RESPONSE_KEY) || {};
+  const latestEwb = getJson(LATEST_EWB_KEY) || {};
+  const history = getJson(EWB_HISTORY_KEY) || {};
+  const savedPayload = getJson(STORAGE_KEY) || {};
 
-  // Load data
-  const loginData = getJson(LOGIN_RESPONSE_KEY);
-  const latestEwb = getJson(LATEST_EWB_KEY);
-  const history = getJson(EWB_HISTORY_KEY);
-  const savedData = getJson(STORAGE_KEY);
-
-  // Last EWB no
-  const lastEwb =
-    latestEwb?.response?.ewbNo ||
-    history?.response?.ewbNo ||
-    "";
-
-  // -----------------------------
-  // STATE
-  // -----------------------------
+  // ---------------------------
+  // HEADERS (visible + editable)
+  // ---------------------------
   const [headers, setHeaders] = useState({
-    accept: "application/json",
-    companyId: loginData.companyId || "",
-    "X-Auth-Token": loginData.token || "",
+    Accept: "application/json",
+    companyId: loginData?.companyId || "",
+    "X-Auth-Token": loginData?.authToken || loginData?.token || "",
     product: "TOPAZ",
   });
 
+  // ---------------------------
+  // PAYLOAD (visible + editable)
+  // ---------------------------
   const [payload, setPayload] = useState({
-    docType: savedData.docType || "INV",
-    docNum: savedData.docNum || "",
     userGstin:
-      loginData.userGstin ||
       latestEwb?.response?.fromGstin ||
+      loginData?.gstin ||
+      loginData?.userGstin ||
+      savedPayload?.userGstin ||
       "",
-    tripSheetEwbBills: lastEwb ? [lastEwb] : [],
+    docType:
+      latestEwb?.response?.docType ||
+      savedPayload?.docType ||
+      "INV", // Default
+    docNum:
+      latestEwb?.response?.docNo ||
+      latestEwb?.docNo ||
+      savedPayload?.docNum ||
+      "",
   });
 
-  const [response, setResponse] = useState(null);
+  // ---------------------------
+  // API Result
+  // ---------------------------
+  const [result, setResult] = useState(null);
   const [error, setError] = useState(null);
-  const [loading, setLoading] = useState(false);
 
-  // -----------------------------
-  // AUTOFILL FROM LOCAL STORAGE
-  // -----------------------------
+  // -------------------------------------------------
+  // AUTOFILL on component load
+  // -------------------------------------------------
   useEffect(() => {
-    const savedEwb = getJson(LATEST_EWB_KEY);
-
-    let ewbs = [];
-    let gstin = "";
-    let docNum = "";
-
-    // EWB No list
-    if (Array.isArray(savedEwb.allEwbs)) {
-      ewbs = savedEwb.allEwbs.map((x) => x.ewbNo).filter(Boolean);
-    } else if (savedEwb?.response?.ewbNo) {
-      ewbs = [savedEwb.response.ewbNo];
-    }
-
-    if (ewbs.length === 0) ewbs = ["351010498047"];
-
-    // GSTIN Auto
-    gstin =
-      savedEwb?.fullApiResponse?.response?.fromGstin ||
-      savedEwb?.fromGstin ||
-      "";
-
-    // DocNo Auto
-    docNum =
-      savedEwb?.fullApiResponse?.response?.docNo ||
-      savedEwb?.docNo ||
-      "";
-
+    // Auto-update payload from latestEWB if available
     setPayload((prev) => ({
       ...prev,
-      userGstin: gstin,
-      docNum: docNum,
-      tripSheetEwbBills: ewbs,
+      userGstin:
+        latestEwb?.response?.fromGstin ||
+        loginData?.gstin ||
+        prev.userGstin,
+
+      docNum:
+        latestEwb?.response?.docNo ||
+        latestEwb?.docNo ||
+        prev.docNum,
+
+      docType:
+        latestEwb?.response?.docType ||
+        prev.docType,
     }));
   }, []);
 
-  // -----------------------------
-  // HANDLERS
-  // -----------------------------
-  const updatePayload = (key, value) => {
-    setPayload((prev) => ({ ...prev, [key]: value }));
-  };
-
+  // =======================
+  // UPDATE HANDLERS
+  // =======================
   const updateHeader = (key, value) => {
     setHeaders((prev) => ({ ...prev, [key]: value }));
   };
 
-  // -----------------------------
-  // API REQUEST (GET WITH PARAMS)
-  // -----------------------------
-  const fetchEWB = async () => {
-    setLoading(true);
+  const updatePayload = (key, value) => {
+    setPayload((prev) => ({ ...prev, [key]: value }));
+  };
+
+  // =======================
+  // API CALL
+  // =======================
+  const fetchData = async () => {
     setError(null);
+    setResult(null);
 
     try {
       const res = await axios.get(
         "http://localhost:3001/proxy/topaz/ewb/byDocNumType",
         {
           params: payload,
-          headers: {
-            Accept: "application/json",
-            "Content-Type": "application/json",
-            companyId: headers.companyId,
-            "X-Auth-Token": headers["X-Auth-Token"],
-            product: "TOPAZ",
-          },
+          headers: headers,
         }
       );
 
-      const data = res.data?.response || {};
-      setResponse(data);
+      setResult(res.data);
 
-      // Store latest EWB if received
-      if (data?.ewbNo) {
-        setPayload((prev) => ({
-          ...prev,
-          tripSheetEwbBills: [data.ewbNo],
-        }));
+      // Save payload
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
+
+      // Save latest EWB if present
+      if (res.data?.response) {
+        localStorage.setItem(LATEST_EWB_KEY, JSON.stringify(res.data));
       }
+
+      // Save history
+      const oldHistory = getJson(EWB_HISTORY_KEY) || [];
+      localStorage.setItem(
+        EWB_HISTORY_KEY,
+        JSON.stringify([...oldHistory, res.data])
+      );
     } catch (err) {
       setError(err.response?.data || err.message);
-      setResponse(null);
-    } finally {
-      setLoading(false);
     }
   };
 
-  // -----------------------------
-  // UI
-  // -----------------------------
   return (
-    <div style={{ maxWidth: "700px", margin: "20px auto", fontFamily: "Arial" }}>
-      <h2>Ewaybill Lookup (Auto-Populate)</h2>
+    <div style={{ maxWidth: 900, margin: "20px auto", fontFamily: "Arial" }}>
+      <h2>EWB Lookup by Document Number + Type</h2>
 
-      <div style={{ marginBottom: "20px" }}>
-        <label>
-          Document Type:
-          <input
-            value={payload.docType}
-            onChange={(e) => updatePayload("docType", e.target.value)}
-            style={{ marginLeft: "10px" }}
-          />
-        </label>
+      {/* ----------------------------- */}
+      {/* PAYLOAD INPUTS */}
+      {/* ----------------------------- */}
+      <h3>Payload</h3>
 
-        <br />
+      <label>GSTIN:</label>
+      <input
+        value={payload.userGstin}
+        onChange={(e) => updatePayload("userGstin", e.target.value)}
+        style={{ width: "100%", marginBottom: 10 }}
+      />
 
-        <label>
-          Document Number:
-          <input
-            value={payload.docNum}
-            onChange={(e) => updatePayload("docNum", e.target.value)}
-            style={{ marginLeft: "10px" }}
-          />
-        </label>
+      <label>Document Type:</label>
+      <input
+        value={payload.docType}
+        onChange={(e) => updatePayload("docType", e.target.value)}
+        style={{ width: "100%", marginBottom: 10 }}
+      />
 
-        <br />
+      <label>Document Number:</label>
+      <input
+        value={payload.docNum}
+        onChange={(e) => updatePayload("docNum", e.target.value)}
+        style={{ width: "100%", marginBottom: 10 }}
+      />
 
-        <label>
-          User GSTIN:
-          <input
-            value={payload.userGstin}
-            onChange={(e) => updatePayload("userGstin", e.target.value)}
-            style={{ marginLeft: "10px" }}
-          />
-        </label>
+      <button
+        onClick={fetchData}
+        style={{ padding: "10px 20px", marginTop: 20 }}
+      >
+        Fetch EWB
+      </button>
 
-        <br />
+      {/* ----------------------------- */}
+      {/* HEADERS UI */}
+      {/* ----------------------------- */}
+      <h3 style={{ marginTop: 30 }}>Headers</h3>
 
-        <button
-          onClick={fetchEWB}
-          style={{ marginTop: "10px", padding: "8px 15px" }}
-        >
-          {loading ? "Fetching..." : "Fetch EWB"}
-        </button>
-      </div>
-
-      {/* Headers */}
-      <h4>Headers</h4>
       {Object.entries(headers).map(([key, value]) => (
-        <div key={key} style={{ marginBottom: "8px" }}>
-          <strong>{key}: </strong>
+        <div key={key} style={{ marginBottom: 10 }}>
+          <strong>{key}</strong>
           <input
             value={value}
             onChange={(e) => updateHeader(key, e.target.value)}
-            style={{ marginLeft: "10px", width: "70%" }}
+            style={{ width: "100%", marginTop: 5 }}
           />
         </div>
       ))}
 
-      {/* Payload */}
-      <h4>Payload</h4>
-      <pre style={{ background: "#f5f5f5", padding: "10px" }}>
+      {/* ----------------------------- */}
+      {/* SHOW PAYLOAD JSON */}
+      {/* ----------------------------- */}
+      <h3>Payload JSON</h3>
+      <pre style={{ background: "#f5f5f5", padding: 15 }}>
         {JSON.stringify(payload, null, 2)}
       </pre>
 
-      {/* API Response */}
-      <h4>API Response</h4>
-      {error && <pre style={{ color: "red" }}>{JSON.stringify(error, null, 2)}</pre>}
-      {response && (
-        <pre style={{ background: "#eee", padding: "10px" }}>
-          {JSON.stringify(response, null, 2)}
+      {/* ----------------------------- */}
+      {/* API RESPONSE */}
+      {/* ----------------------------- */}
+      <h3>Response</h3>
+      {error && (
+        <pre style={{ background: "#fee", padding: 15, color: "red" }}>
+          {JSON.stringify(error, null, 2)}
+        </pre>
+      )}
+
+      {result && (
+        <pre style={{ background: "#eef", padding: 15 }}>
+          {JSON.stringify(result, null, 2)}
         </pre>
       )}
     </div>

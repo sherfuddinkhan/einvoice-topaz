@@ -1,9 +1,6 @@
 import React, { useState, useEffect } from "react";
 import axios from "axios";
 
-// ======================
-// LocalStorage Keys
-// ======================
 const STORAGE_KEY = "iris_transporter_ewaybills";
 const FORM_KEY = "iris_transporter_form";
 const LOGIN_KEY = "iris_login_data";
@@ -12,28 +9,14 @@ const LATEST_EWB_KEY = "latestEwbData";
 
 const AssignedEwbTransporter = () => {
   // ======================
-  // READ LOCAL STORAGE ONCE
-  // ======================
-  const savedForm = JSON.parse(localStorage.getItem(FORM_KEY) || "{}");
-  const loginData = JSON.parse(localStorage.getItem(LOGIN_KEY) || "{}");
-
-  const last = JSON.parse(localStorage.getItem(LATEST_EWB_KEY) || "{}");
-  const hist = JSON.parse(localStorage.getItem(EWB_HISTORY_KEY) || "{}");
-   
-  const savedResponse = JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]");
-  console.log("savedForm",savedForm)
-   console.log("last",last)
-  const initialGstin = last.response.toGstin|| hist.response.toGstin|| "";
-
-  // ======================
   // STATES
   // ====================== 
   const [form, setForm] = useState({
-    date: savedForm.date || "15/11/2025",
-    userGstin: initialGstin,
-    page: savedForm.page || "1",
-    size: savedForm.size || "10",
-    updateNeeded: savedForm.updateNeeded || "true",
+    date: "",
+    userGstin: "",
+    page: "1",
+    size: "10",
+    updateNeeded: "true",
   });
 
   const [headers, setHeaders] = useState({
@@ -41,20 +24,44 @@ const AssignedEwbTransporter = () => {
     token: "",
   });
 
-  const [ewayBills, setEwayBills] = useState(savedResponse);
+  const [ewayBills, setEwayBills] = useState([]); // always array
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [requestLog, setRequestLog] = useState(null);
 
   // ======================
-  // LOAD HEADERS FROM LOGIN
+  // Load from localStorage on mount
   // ======================
   useEffect(() => {
-    if (loginData.companyId && loginData.token) {
-      setHeaders({
-        companyId: loginData.companyId,
-        token: loginData.token,
+    try {
+      const savedForm = JSON.parse(localStorage.getItem(FORM_KEY) || "{}");
+      const loginData = JSON.parse(localStorage.getItem(LOGIN_KEY) || "{}");
+      const last = JSON.parse(localStorage.getItem(LATEST_EWB_KEY) || "{}");
+      const hist = JSON.parse(localStorage.getItem(EWB_HISTORY_KEY) || "{}");
+      const savedResponse = JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]");
+
+      const initialGstin = last?.response?.toGstin || hist?.response?.toGstin || "";
+
+      setForm({
+        date: savedForm.date || last?.response?.ewbDate?.split(" ")[0] || "15/11/2025",
+        userGstin: savedForm.userGstin || initialGstin,
+        page: savedForm.page || "1",
+        size: savedForm.size || "10",
+        updateNeeded: savedForm.updateNeeded || "true",
       });
+
+      if (loginData?.companyId && loginData?.token) {
+        setHeaders({
+          companyId: loginData.companyId,
+          token: loginData.token,
+        });
+      }
+
+      // Ensure ewayBills is always an array
+      setEwayBills(Array.isArray(savedResponse) ? savedResponse : []);
+    } catch (err) {
+      console.error("Error reading localStorage", err);
+      setEwayBills([]);
     }
   }, []);
 
@@ -83,7 +90,6 @@ const AssignedEwbTransporter = () => {
 
     const reqParams = { ...form };
 
-    // Save request details to UI
     setRequestLog({ headers: reqHeaders, params: reqParams });
 
     try {
@@ -96,11 +102,12 @@ const AssignedEwbTransporter = () => {
       );
 
       const list = response.data?.response || [];
-
-      setEwayBills(list);
+      setEwayBills(Array.isArray(list) ? list : []);
       localStorage.setItem(STORAGE_KEY, JSON.stringify(list));
     } catch (err) {
+      console.error(err);
       setError("Unable to fetch transporter assigned E-way bills");
+      setEwayBills([]); // fallback
     }
 
     setLoading(false);
@@ -112,12 +119,9 @@ const AssignedEwbTransporter = () => {
 
       {/* ================= HEADER INFO ================= */}
       <div style={{ marginBottom: "15px" }}>
-  <p><b>Company ID:</b> {headers.companyId || "(Not Found)"}</p>
-
-  {/* SHOW FULL AUTH TOKEN */}
-  <p><b>Auth Token:</b> {headers.token || "(Missing Token)"}</p>
-</div>
-
+        <p><b>Company ID:</b> {headers.companyId || "(Not Found)"}</p>
+        <p><b>Auth Token:</b> {headers.token || "(Missing Token)"}</p>
+      </div>
 
       {/* ================= FORM ================= */}
       <div style={{ marginBottom: "20px" }}>
@@ -129,7 +133,6 @@ const AssignedEwbTransporter = () => {
           onChange={handleChange}
           style={{ marginRight: "10px" }}
         />
-
         <input
           type="text"
           name="userGstin"
@@ -138,7 +141,6 @@ const AssignedEwbTransporter = () => {
           onChange={handleChange}
           style={{ marginRight: "10px" }}
         />
-
         <input
           type="number"
           name="page"
@@ -147,7 +149,6 @@ const AssignedEwbTransporter = () => {
           onChange={handleChange}
           style={{ width: "70px", marginRight: "10px" }}
         />
-
         <input
           type="number"
           name="size"
@@ -156,7 +157,6 @@ const AssignedEwbTransporter = () => {
           onChange={handleChange}
           style={{ width: "70px", marginRight: "10px" }}
         />
-
         <select
           name="updateNeeded"
           value={form.updateNeeded}
@@ -182,7 +182,6 @@ const AssignedEwbTransporter = () => {
         >
           <h3>📤 Request Headers</h3>
           <pre>{JSON.stringify(requestLog.headers, null, 2)}</pre>
-
           <h3>📦 Request Payload / Params</h3>
           <pre>{JSON.stringify(requestLog.params, null, 2)}</pre>
         </div>

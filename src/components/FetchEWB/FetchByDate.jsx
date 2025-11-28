@@ -5,22 +5,12 @@ const LOGIN_KEY = "iris_login_data";
 const LATEST_EWB_KEY = "latestEwbData";
 
 const FetchByDate = () => {
-  const [date, setDate] = useState("");
+  const [date, setDate] = useState(""); // DD/MM/YYYY
   const [userGstin, setUserGstin] = useState("");
 
   const [headersUI, setHeadersUI] = useState({});
   const [payloadUI, setPayloadUI] = useState({});
   const [response, setResponse] = useState(null);
-
-  // --------------------------
-  // Format DD/MM/YYYY -> YYYY-MM-DD
-  // --------------------------
-  const formatDate = (dateStr) => {
-    if (!dateStr) return "";
-    const [datePart] = dateStr.split(" "); // remove time
-    const [dd, mm, yyyy] = datePart.split("/");
-    return `${yyyy}-${mm}-${dd}`;
-  };
 
   // --------------------------
   // Load login + latest EWB
@@ -36,11 +26,15 @@ const FetchByDate = () => {
       companyid: login.companyId || "",
       "x-auth-token": login.token || "",
     };
+    const userGstin = latest?.response?.fromGstin ||"";
+        
     setHeadersUI(headers);
-
-    // Prefill fields
-    setDate(formatDate(latest?.response?.ewbDate));
-    setUserGstin(latest?.response?.fromGstin || "");
+       // Prefill fields, only date part
+  const latestDateTime = latest?.response?.ewbDate || "";
+  const latestDate = latestDateTime.split(" ")[0]; // take only DD/MM/YYYY
+  setDate(latestDate);
+    // Prefill fields (keep DD/MM/YYYY format)
+    setUserGstin(userGstin);
   }, []);
 
   // --------------------------
@@ -48,7 +42,7 @@ const FetchByDate = () => {
   // --------------------------
   const fetchEwbs = async () => {
     const payload = {
-      date,
+      date,      // DD/MM/YYYY format as-is
       userGstin,
     };
 
@@ -75,12 +69,12 @@ const FetchByDate = () => {
 
       {/* DATE */}
       <div>
-        <label>Date (YYYY-MM-DD)</label>
+        <label>Date (DD/MM/YYYY)</label>
         <br />
         <input
           value={date}
           onChange={(e) => setDate(e.target.value)}
-          placeholder="2025-11-26"
+          placeholder="26/11/2025"
           style={{ padding: 6, width: 200 }}
         />
       </div>
