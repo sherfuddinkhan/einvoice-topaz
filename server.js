@@ -118,7 +118,9 @@ app.post("/proxy/topaz/ewb/updateTransporter", (req, res) =>
 // ======================
 // routes/proxy/topaz.js or wherever you have it
 
-
+// -------------------------------
+// GET EWB BY DATE - PROXY ROUTE
+// -------------------------------
 app.get("/proxy/topaz/ewb/fetchByDate", (req, res) =>
   proxyRequest(res, () =>
     axios.get(
@@ -128,13 +130,59 @@ app.get("/proxy/topaz/ewb/fetchByDate", (req, res) =>
         headers: {
           Accept: "application/json",
           product: "TOPAZ",
-          "X-Auth-Token": req.headers["x-auth-token"] || req.headers["X-Auth-Token"],
-          companyId: req.headers["companyid"] || req.headers["companyId"],
+          "X-Auth-Token": req.headers["x-auth-token"],
+          companyId: req.headers["companyid"],
         },
       }
     )
   )
 );
+
+
+
+app.get("/proxy/topaz/api/transporter-ewb", async (req, res) => {
+  try {
+    const { date, userGstin, page = "1", size = "10", updateNeeded = "true" } = req.query;
+
+    const companyId = req.headers["companyid"] || req.headers["companyId"];
+    const token = req.headers["x-auth-token"];
+
+    if (!companyId || !token) {
+      return res.status(401).json({ status: "ERROR", message: "Missing auth headers" });
+    }
+    if (!date || !userGstin) {
+      return res.status(400).json({ status: "ERROR", message: "date & userGstin required" });
+    }
+
+    const irisResponse = await axios.get(
+      `${BASE_URL}/irisgst/topaz/api/v0.3/getewb/transporter`,
+      {
+        params: { date, userGstin, page, size, updateNeeded: updateNeeded === "true" },
+        headers: {
+          accept: "application/json",
+          companyId,
+          "X-Auth-Token": token,
+          product: "TOPAZ",
+        },
+        timeout: 30000,
+      }
+    );
+
+    res.json({
+      status: "SUCCESS",
+      response: irisResponse.data.response || irisResponse.data,
+    });
+  } catch (error) {
+    console.error(error.response?.data || error.message);
+    res.status(error.response?.status || 500).json({
+      status: "ERROR",
+      message: error.message,
+      details: error.response?.data || null,
+    });
+  }
+});
+
+
 
 
 

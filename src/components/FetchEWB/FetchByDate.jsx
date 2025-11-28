@@ -1,55 +1,77 @@
 import React, { useState, useEffect } from "react";
-import api from "../../api/irisgstApi";
+import axios from "axios";
 
 const LOGIN_KEY = "iris_login_data";
 const LATEST_EWB_KEY = "latestEwbData";
 
 const FetchByDate = () => {
-  const [date, setDate] = useState(""); // DD/MM/YYYY
+  const [date, setDate] = useState(""); // user input
   const [userGstin, setUserGstin] = useState("");
 
   const [headersUI, setHeadersUI] = useState({});
   const [payloadUI, setPayloadUI] = useState({});
   const [response, setResponse] = useState(null);
 
-  // --------------------------
-  // Load login + latest EWB
-  // --------------------------
+  // ----------------------------------------
+  // Load headers + latest EWB
+  // ----------------------------------------
   useEffect(() => {
     const login = JSON.parse(localStorage.getItem(LOGIN_KEY) || "{}");
     const latest = JSON.parse(localStorage.getItem(LATEST_EWB_KEY) || "{}");
 
-    // Build correct IRIS headers
     const headers = {
       accept: "application/json",
       product: "TOPAZ",
       companyid: login.companyId || "",
       "x-auth-token": login.token || "",
     };
-    const userGstin = latest?.response?.fromGstin ||"";
-        
+
     setHeadersUI(headers);
-       // Prefill fields, only date part
-  const latestDateTime = latest?.response?.ewbDate || "";
-  const latestDate = latestDateTime.split(" ")[0]; // take only DD/MM/YYYY
-  setDate(latestDate);
-    // Prefill fields (keep DD/MM/YYYY format)
-    setUserGstin(userGstin);
+
+    // Prefill date (DD/MM/YYYY)
+    const latestDate = latest?.response?.ewbDate?.split(" ")[0] || "";
+    setDate(latestDate);
+
+    // Prefill GSTIN
+    setUserGstin(latest?.response?.fromGstin || "");
   }, []);
 
-  // --------------------------
-  // Fetch EWB by Date
-  // --------------------------
+  // ----------------------------------------
+  // Fix date → convert DD/MM/YY to DD/MM/YYYY
+  // ----------------------------------------
+  const fixDateFormat = (d) => {
+    if (!d) return d;
+
+    const parts = d.split("/");
+    if (parts.length !== 3) return d;
+
+    if (parts[2].length === 2) {
+      parts[2] = "20" + parts[2]; // convert 25 → 2025
+    }
+
+    return parts.join("/");
+  };
+
+  // ----------------------------------------
+  // Fetch EWBs (axios only)
+  // ----------------------------------------
   const fetchEwbs = async () => {
+    const finalDate = fixDateFormat(date);
+
     const payload = {
-      date,      // DD/MM/YYYY format as-is
+      date: finalDate,
       userGstin,
     };
 
     setPayloadUI(payload);
 
+    console.log("📤 REQUEST URL:", "http://localhost:3001/proxy/topaz/ewb/fetchByDate");
+    console.log("📤 REQUEST HEADERS:", headersUI);
+    console.log("📤 FIXED DATE SENT:", finalDate);
+    console.log("📤 REQUEST PARAMS:", payload);
+
     try {
-      const res = await api.get(
+      const res = await axios.get(
         "http://localhost:3001/proxy/topaz/ewb/fetchByDate",
         {
           params: payload,
@@ -57,17 +79,24 @@ const FetchByDate = () => {
         }
       );
 
+      console.log("✅ RESPONSE SUCCESS:", res.data);
       setResponse(res.data);
+
     } catch (error) {
-      setResponse(error.response?.data || error.message);
+      const err = error.response?.data || error.message;
+      console.log("❌ RESPONSE ERROR:", err);
+      setResponse(err);
     }
   };
 
+  // ----------------------------------------
+  // UI
+  // ----------------------------------------
   return (
     <div style={{ padding: 20, fontFamily: "Arial" }}>
       <h2>Fetch Generated E-Way Bills by Date</h2>
 
-      {/* DATE */}
+      {/* Date input */}
       <div>
         <label>Date (DD/MM/YYYY)</label>
         <br />
@@ -79,7 +108,7 @@ const FetchByDate = () => {
         />
       </div>
 
-      {/* GSTIN */}
+      {/* GSTIN input */}
       <div style={{ marginTop: 10 }}>
         <label>User GSTIN</label>
         <br />
@@ -105,19 +134,19 @@ const FetchByDate = () => {
         Fetch EWB
       </button>
 
-      {/* HEADERS */}
+      {/* Headers */}
       <h3>Request Headers</h3>
       <pre style={{ background: "#f3f3f3", padding: 10 }}>
         {JSON.stringify(headersUI, null, 2)}
       </pre>
 
-      {/* PAYLOAD */}
+      {/* Query Params */}
       <h3>Query Parameters (Payload)</h3>
       <pre style={{ background: "#fafafa", padding: 10 }}>
         {JSON.stringify(payloadUI, null, 2)}
       </pre>
 
-      {/* RESPONSE */}
+      {/* Response */}
       <h3>Response</h3>
       <pre style={{ background: "#e8f5e9", padding: 10 }}>
         {JSON.stringify(response, null, 2)}

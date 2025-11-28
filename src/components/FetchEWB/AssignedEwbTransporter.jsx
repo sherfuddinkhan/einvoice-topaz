@@ -1,219 +1,130 @@
 import React, { useState, useEffect } from "react";
 import axios from "axios";
 
-const STORAGE_KEY = "iris_transporter_ewaybills";
 const FORM_KEY = "iris_transporter_form";
 const LOGIN_KEY = "iris_login_data";
-const EWB_HISTORY_KEY = "ewbHistory";
-const LATEST_EWB_KEY = "latestEwbData";
 
 const AssignedEwbTransporter = () => {
-  // ======================
-  // STATES
-  // ====================== 
   const [form, setForm] = useState({
-    date: "",
-    userGstin: "",
+    date: "26/11/2025",
+    userGstin: "05AAAAU1183B1Z0",
     page: "1",
     size: "10",
     updateNeeded: "true",
   });
 
-  const [headers, setHeaders] = useState({
-    companyId: "",
-    token: "",
-  });
-
-  const [ewayBills, setEwayBills] = useState([]); // always array
+  const [headers, setHeaders] = useState({ companyId: "", token: "" });
+  const [rawResponse, setRawResponse] = useState(null);   // ← stays null until fetch
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [requestLog, setRequestLog] = useState(null);
 
-  // ======================
-  // Load from localStorage on mount
-  // ======================
+  // Only restore form + login on mount — NOT the previous response
   useEffect(() => {
     try {
       const savedForm = JSON.parse(localStorage.getItem(FORM_KEY) || "{}");
-      const loginData = JSON.parse(localStorage.getItem(LOGIN_KEY) || "{}");
-      const last = JSON.parse(localStorage.getItem(LATEST_EWB_KEY) || "{}");
-      const hist = JSON.parse(localStorage.getItem(EWB_HISTORY_KEY) || "{}");
-      const savedResponse = JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]");
+      const login = JSON.parse(localStorage.getItem(LOGIN_KEY) || "{}");
 
-      const initialGstin = last?.response?.toGstin || hist?.response?.toGstin || "";
-
-      setForm({
-        date: savedForm.date || last?.response?.ewbDate?.split(" ")[0] || "15/11/2025",
-        userGstin: savedForm.userGstin || initialGstin,
-        page: savedForm.page || "1",
-        size: savedForm.size || "10",
-        updateNeeded: savedForm.updateNeeded || "true",
-      });
-
-      if (loginData?.companyId && loginData?.token) {
-        setHeaders({
-          companyId: loginData.companyId,
-          token: loginData.token,
-        });
+      if (Object.keys(savedForm).length > 0) {
+        setForm((prev) => ({ ...prev, ...savedForm }));
       }
-
-      // Ensure ewayBills is always an array
-      setEwayBills(Array.isArray(savedResponse) ? savedResponse : []);
-    } catch (err) {
-      console.error("Error reading localStorage", err);
-      setEwayBills([]);
+      if (login.companyId && login.token) {
+        setHeaders({ companyId: login.companyId, token: login.token });
+      }
+    } catch (e) {
+      console.error("localStorage parse error", e);
     }
+    // rawResponse intentionally NOT loaded here
   }, []);
 
-  // ======================
-  // INPUT HANDLER
-  // ======================
   const handleChange = (e) => {
     const updated = { ...form, [e.target.name]: e.target.value };
     setForm(updated);
     localStorage.setItem(FORM_KEY, JSON.stringify(updated));
   };
 
-  // ======================
-  // FETCH DATA
-  // ======================
   const fetchData = async () => {
-    setLoading(true);
-    setError("");
-
-    const reqHeaders = {
-      accept: "application/json",
-      companyId: headers.companyId,
-      "X-Auth-Token": headers.token,
-      product: "TOPAZ",
-    };
-
-    const reqParams = { ...form };
-
-    setRequestLog({ headers: reqHeaders, params: reqParams });
-
-    try {
-      const response = await axios.get(
-        "https://stage-api.irisgst.com/irisgst/topaz/api/v0.3/getewb/transporter",
-        {
-          params: reqParams,
-          headers: reqHeaders,
-        }
-      );
-
-      const list = response.data?.response || [];
-      setEwayBills(Array.isArray(list) ? list : []);
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(list));
-    } catch (err) {
-      console.error(err);
-      setError("Unable to fetch transporter assigned E-way bills");
-      setEwayBills([]); // fallback
+    if (!headers.companyId || !headers.token) {
+      setError("Missing login credentials (companyId / token)");
+      return;
     }
 
-    setLoading(false);
+    setLoading(true);
+    setError("");
+    setRawResponse(null);          // ← clear previous result every time
+
+    try {
+      const res = await axios.get("http://localhost:3001/proxy/topaz/api/transporter-ewb", {
+        params: form,
+        headers: {
+          companyId: headers.companyId,
+          "X-Auth-Token": headers.token,
+          product: "TOPAZ",
+        },
+        timeout: 30000,
+      });
+
+      setRawResponse(res.data);     // ← only now we show it
+    } catch (err) {
+      const msg = err.response?.data || err.message;
+      setError("Fetch failed: " + JSON.stringify(msg, null, 2));
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
-    <div style={{ padding: "20px" }}>
-      <h2>📦 Assigned to Transporter - E-Way Bills</h2>
+    <div style={{ padding: 20, fontFamily: "monospace" }}>
+      <h2>Transporter Assigned E-Way Bills – Raw Response</h2>
 
-      {/* ================= HEADER INFO ================= */}
-      <div style={{ marginBottom: "15px" }}>
-        <p><b>Company ID:</b> {headers.companyId || "(Not Found)"}</p>
-        <p><b>Auth Token:</b> {headers.token || "(Missing Token)"}</p>
+      <div style={{ marginBottom: 15, padding: 10, background: "#f9f9f9", borderRadius: 6 }}>
+        <strong>Company ID:</strong> {headers.companyId || "—"} <br />
+        <strong>Token:</strong> {headers.token ? "Present" : "Missing"}
       </div>
 
-      {/* ================= FORM ================= */}
-      <div style={{ marginBottom: "20px" }}>
-        <input
-          type="text"
-          name="date"
-          placeholder="dd/mm/yyyy"
-          value={form.date}
-          onChange={handleChange}
-          style={{ marginRight: "10px" }}
-        />
-        <input
-          type="text"
-          name="userGstin"
-          placeholder="User GSTIN"
-          value={form.userGstin}
-          onChange={handleChange}
-          style={{ marginRight: "10px" }}
-        />
-        <input
-          type="number"
-          name="page"
-          placeholder="Page"
-          value={form.page}
-          onChange={handleChange}
-          style={{ width: "70px", marginRight: "10px" }}
-        />
-        <input
-          type="number"
-          name="size"
-          placeholder="Size"
-          value={form.size}
-          onChange={handleChange}
-          style={{ width: "70px", marginRight: "10px" }}
-        />
-        <select
-          name="updateNeeded"
-          value={form.updateNeeded}
-          onChange={handleChange}
-          style={{ marginRight: "10px" }}
-        >
+      <div style={{ marginBottom: 20, display: "flex", flexWrap: "wrap", gap: 12, alignItems: "center" }}>
+        <input name="date" value={form.date} onChange={handleChange} placeholder="dd/mm/yyyy" />
+        <input name="userGstin" value={form.userGstin} onChange={handleChange} placeholder="GSTIN" style={{ width: 220 }} />
+        <input name="page" type="number" value={form.page} onChange={handleChange} style={{ width: 70 }} />
+        <input name="size" type="number" value={form.size} onChange={handleChange} style={{ width: 70 }} />
+        <select name="updateNeeded" value={form.updateNeeded} onChange={handleChange}>
           <option value="true">Update from NIC</option>
-          <option value="false">Use Cached</option>
+          <option value="false">Use Cache</option>
         </select>
-
-        <button onClick={fetchData}>Fetch</button>
+        <button onClick={fetchData} disabled={loading} style={{ padding: "8px 16px" }}>
+          {loading ? "Fetching..." : "Fetch Now"}
+        </button>
       </div>
 
-      {/* ================= SHOW HEADERS + PAYLOAD ================= */}
-      {requestLog && (
-        <div
-          style={{
-            background: "#f0f0f0",
-            padding: "15px",
-            borderRadius: "8px",
-            marginBottom: "20px",
-          }}
-        >
-          <h3>📤 Request Headers</h3>
-          <pre>{JSON.stringify(requestLog.headers, null, 2)}</pre>
-          <h3>📦 Request Payload / Params</h3>
-          <pre>{JSON.stringify(requestLog.params, null, 2)}</pre>
+      {error && (
+        <pre style={{ background: "#ffeeee", color: "darkred", padding: 15, borderRadius: 6, overflow: "auto" }}>
+          {error}
+        </pre>
+      )}
+
+      {rawResponse && (
+        <div>
+          <h3>Response (only shown after clicking Fetch):</h3>
+          <pre
+            style={{
+              background: "#f5f5f5",
+              padding: 20,
+              borderRadius: 8,
+              border: "1px solid #ddd",
+              overflow: "auto",
+              maxHeight: "80vh",
+              whiteSpace: "pre-wrap",
+            }}
+          >
+            {JSON.stringify(rawResponse, null, 2)}
+          </pre>
         </div>
       )}
 
-      {/* ================= STATUS ================= */}
-      {loading && <p>Loading...</p>}
-      {error && <p style={{ color: "red" }}>{error}</p>}
-
-      {/* ================= TABLE ================= */}
-      <table border="1" width="100%" cellPadding="8">
-        <thead>
-          <tr>
-            <th>Error Code</th>
-            <th>Error Description</th>
-          </tr>
-        </thead>
-        <tbody>
-          {ewayBills.length === 0 ? (
-            <tr>
-              <td colSpan="2">No Data Found</td>
-            </tr>
-          ) : (
-            ewayBills.map((item, i) => (
-              <tr key={i}>
-                <td>{item.ewbErrorCode}</td>
-                <td>{item.ewbErrorDesc}</td>
-              </tr>
-            ))
-          )}
-        </tbody>
-      </table>
+      {!rawResponse && !loading && !error && (
+        <p style={{ color: "#888", fontStyle: "italic" }}>
+          Click “Fetch Now” to see the raw JSON response.
+        </p>
+      )}
     </div>
   );
 };
