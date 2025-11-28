@@ -11,7 +11,26 @@ const LS_KEYS = {
   TOKEN: "iris_login_token",
 };
 
+const LOGIN_KEY = "iris_login_data";
+const LATEST_EWB_KEY = "latestEwbData";
+const STORAGE_KEY = "BULK_DOCNUM_PAYLOAD";
+
+// Helper to read JSON safely
+const getJson = (key) => {
+  try {
+    return JSON.parse(localStorage.getItem(key) || "null");
+  } catch {
+    return null;
+  }
+};
+
+
 const BulkStatus = () => {
+   const login = getJson(LOGIN_KEY) || {};
+  const latest = getJson(LATEST_EWB_KEY) || {};
+  const saved = getJson(STORAGE_KEY) || {};
+console.log("latest",latest);
+
   const [headers, setHeaders] = useState({
     companyId: "",
     authToken: "",
@@ -30,10 +49,14 @@ const BulkStatus = () => {
   // Auto-populate headers and query
   // ----------------------------
   useEffect(() => {
+    const LOGIN_KEY = "iris_login_data";
+    const LATEST_EWB_KEY = "latestEwbData";
+    const STORAGE_KEY = "BULK_DOCNUM_PAYLOAD";
+
     const loginData = JSON.parse(localStorage.getItem("iris_login_data") || "{}");
 
     const headerCompanyId = localStorage.getItem(LS_KEYS.HEADER_COMPANY) || loginData.companyId || "4";
-    const queryCompanyId = localStorage.getItem(LS_KEYS.QUERY_COMPANY) || "13";
+    const queryCompanyId = latest?.response?.companyId ||loginData?.companyId || "";
     const userGstin = localStorage.getItem(LS_KEYS.GSTIN) || loginData.gstin || "05AAAAU1183B5ZW";
     const token = loginData.authToken || loginData.token || localStorage.getItem(LS_KEYS.TOKEN) || "";
 
@@ -82,6 +105,7 @@ const BulkStatus = () => {
       });
 
       setResponse(res.data);
+      localStorage.setItem("bulkStatusLatest", JSON.stringify(res.data));
     } catch (err) {
       setResponse(err.response?.data || { status: "ERROR", message: err.message });
     }

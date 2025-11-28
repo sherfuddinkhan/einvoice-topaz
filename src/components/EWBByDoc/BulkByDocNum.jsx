@@ -8,6 +8,7 @@ const LOGIN_KEY = "iris_login_data";
 const LATEST_EWB_KEY = "latestEwbData";
 const STORAGE_KEY = "BULK_DOCNUM_PAYLOAD";
 
+
 // Helper to read JSON safely
 const getJson = (key) => {
   try {
@@ -21,7 +22,7 @@ const BulkByDocNum = () => {
   const login = getJson(LOGIN_KEY) || {};
   const latest = getJson(LATEST_EWB_KEY) || {};
   const saved = getJson(STORAGE_KEY) || {};
-
+console.log("latest",latest);
   // ---------------------------
   // HEADERS
   // ---------------------------
@@ -42,7 +43,7 @@ const BulkByDocNum = () => {
       saved?.userGstin ||
       login?.gstin ||
       "",
-    companyId: saved?.companyId || login?.companyId || "",
+    companyId:latest?.response?.companyId || login?.companyId || "",
     docType:
       latest?.fullApiResponse?.response?.docType ||
       saved?.docType ||

@@ -442,7 +442,7 @@ app.get("/proxy/mgmt/pob/list", (req, res) => {
 // =====================
 app.get('/proxy/mgmt/user/company/filingbusiness', (req, res) => {
   proxyRequest(res, () =>
-    axios.get(`${BASE_URL}/mgmt/user/company/filingbusiness`, {
+    axios.get(`${BASE_URL}/irisgst/mgmt/user/company/filingbusiness`, {
       params: req.query,
       headers: { Accept: 'application/json', ...authHeaders(req) },
     })

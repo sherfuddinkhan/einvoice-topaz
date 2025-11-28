@@ -4,6 +4,8 @@ import axios from "axios";
 const LOGIN_KEY = "iris_login_data";
 const LATEST_EWB_KEY = "latestEwbData";
 const STORAGE_KEY = "EWB_PREVIOUS_DATA";
+const  Bulkstorage_key = "bulkStatusLatest"
+console.log("Bulkstorage_key",Bulkstorage_key)
 const DEFAULT_PROXY = "http://localhost:3001/proxy/topaz/ewb/bulkDownload";
 
 const BulkDownload = () => {
