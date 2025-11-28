@@ -156,8 +156,9 @@ if (transDocDate.length === 0) {
   transDocDate= "12/11/2025"; // or your default like "351010498047" if preferred
 }
 //////////////////
-if (savedEwbData?.fullApiResponse?.response?.vehicleNo) {
-  vehicleNo= savedEwbData.fullApiResponse.response.vehicleNo;
+if (savedEwbData?.payloadUsed?.vehicleNo) 
+  {
+  vehicleNo= savedEwbData.payloadUsed.vehicleNo;
 }
 else if (savedEwbData?.vehicleNo) {
   vehicleNo=savedEwbData.vehicleNo;
@@ -186,7 +187,7 @@ if (transMode.transMode === 0) {
     console.log("📌 transMode", transMode);
     console.log("📌 transDocDate ", transDocDate );
     console.log("📌 transDocNo", transDocNo);
-    console.log("📌 transDocNo", vehicleNo);
+    console.log("📌vehicleNo", vehicleNo);
     // --------------------------
     // Build Payload (using response.* fields)
     // --------------------------
