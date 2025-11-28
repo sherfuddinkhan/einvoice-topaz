@@ -88,7 +88,7 @@ const IRISGSTDashboard = () => {
     "cewb-details": "CEWB Details",
     "cewb-generate": "Generate CEWB",
     "ewb-by-doc-type": "EWB by Doc Type",
-    "ewb-bulk-request": "Bulk Request",
+    "ewb-by-doc": "ewb-by-doc",
     "ewb-bulk-status": "Bulk Status",
     "ewb-bulk-download": "Bulk Download",
     "add-vehicle": "Add Vehicle",
@@ -209,7 +209,7 @@ const IRISGSTDashboard = () => {
         setActiveTab={setActiveTab}
       />
     ),
-    "ewb-bulk-request": (
+    "ewb-by-doc": (
       <BulkByDocNum
         shared={sharedData}
         updateShared={updateSharedData}
@@ -329,7 +329,7 @@ const IRISGSTDashboard = () => {
     { title: "Ewaybill Actions",tabs: ["ewb-update-cancel", "update-transporter"]},
     { title: "Fetch Ewaybill", tabs: ["ewb-by-date", "ewb-other-parties", "ewb-transporter-assigned"]},
     { title: "Consolidate Ewaybill", tabs: ["cewb-details","cewb-generate"] },
-    { title: "Get Ewaybill By Document Number & Type",tabs: ["ewb-by-doc-type","ewb-bulk-request","ewb-bulk-status","ewb-bulk-download"]},
+    { title: "Get Ewaybill By Document Number & Type",tabs: ["ewb-by-doc-type","ewb-by-doc","ewb-bulk-status","ewb-bulk-download"]},
     { title: "Multi-Vehicle",tabs: ["add-vehicle", "edit-vehicle", "group-details", "initiate", "list-requests"]},
     { title: "Print Ewaybill (In Sync mode)",tabs: ["print-details", "print-summary"]},
     { title: "Entity Management",tabs: ["assigned-pob", "add-business", "business-hierarchy", "assigned-gstins"]},

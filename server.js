@@ -221,18 +221,20 @@ app.get("/proxy/topaz/cewb/details", (req, res) =>
 /* ======================================================================
    6. EWB BY DOC NUM & TYPE
    ====================================================================== */
-app.get("/proxy/topaz/ewb/byDocNumType", (req, res) =>
+app.post("/proxy/topaz/ewb/docNum", (req, res) =>
   proxyRequest(res, () =>
-    axios.get(
-      `${BASE_URL}/irisgst/topaz/api/v0.3/getewb/docNumAndType`,
+    axios.post(
+      `${BASE_URL}/irisgst/topaz/api/v0.3/getewb/docNum`,
+      req.body, // ★ PAYLOAD BODY
       {
-        params: req.query,
         headers: {
-          "Accept": "application/json",
-          "Content-Type": "application/json", // ★ REQUIRED
+          Accept: "application/json",
+          "Content-Type": "application/json",
+          companyId: req.headers["companyid"],   // forward companyId header
+          "X-Auth-Token": req.headers["x-auth-token"],
           product: "TOPAZ",
-          ...authHeaders(req)
-        }
+          ...authHeaders(req),
+        },
       }
     )
   )
@@ -241,14 +243,63 @@ app.get("/proxy/topaz/ewb/byDocNumType", (req, res) =>
 
 
 
-app.post("/proxy/topaz/ewb/bulkByDocNum", (req, res) =>
+
+// ===============================
+//  GET: Fetch EWB By DocNum & Type
+// ===============================
+
+app.get("/proxy/topaz/ewb/getByDocNumAndType", async (req, res) => {
+  try {
+    const { userGstin, docType, docNum } = req.query;
+
+    if (!userGstin || !docType || !docNum) {
+      return res.status(400).json({
+        error: "Missing required query params: userGstin, docType, docNum",
+        received: req.query,
+      });
+    }
+
+    const irisUrl = `${BASE_URL}/irisgst/topaz/api/v0.3/getewb/docNumAndType`;
+
+    const response = await axios.get(irisUrl, {
+      params: {
+        userGstin,
+        docType,
+        docNum,
+      },
+      headers: {
+        Accept: "application/json",
+        "Content-Type": "application/json",
+        product: "TOPAZ",
+        companyId: req.headers.companyid,       // from frontend
+        "X-Auth-Token": req.headers["x-auth-token"],
+      },
+    });
+
+    res.json(response.data);
+  } catch (err) {
+    // Handle API errors
+    if (err.response) {
+      return res.status(err.response.status).json(err.response.data);
+    }
+    res.status(500).json({ error: err.message });
+  }
+});
+
+
+
+app.get("/proxy/topaz/ewb/bulkStatus", (req, res) =>
   proxyRequest(res, () =>
-    axios.post(
-      `${BASE_URL}/irisgst/topaz/api/v0.3/getewb/docNum`,
-      req.body,
+    axios.get(
+      `${BASE_URL}/irisgst/topaz/api/v0.3/getewb/docNum/status`,
       {
+        params: {
+          companyId: req.query.companyId,
+          userGstin: req.query.userGstin,
+          docType: req.query.docType,
+          docNumList: req.query.docNumList,
+        },
         headers: {
-          "Content-Type": "application/json",
           Accept: "application/json",
           product: "TOPAZ",
           ...authHeaders(req),
@@ -259,20 +310,6 @@ app.post("/proxy/topaz/ewb/bulkByDocNum", (req, res) =>
 );
 
 
-app.get("/proxy/topaz/ewb/bulkStatus", (req, res) =>
-  proxyRequest(res, () =>
-    axios.get(`${BASE_URL}/irisgst/topaz/api/v0.3/getewb/docNum/status`,
-      {
-        params: req.query,
-        headers: {
-          Accept: "application/json",
-          product: "TOPAZ",
-          ...authHeaders(req)
-        }
-      }
-    )
-  )
-);
 
 
 app.get("/proxy/topaz/ewb/bulkDownload", (req, res) =>

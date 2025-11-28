@@ -1,290 +1,255 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import axios from "axios";
 
-// LOCAL KEYS
+// ---------------------------
+// LocalStorage Keys
+// ---------------------------
 const LOGIN_KEY = "iris_login_data";
 const LATEST_EWB_KEY = "latestEwbData";
-const PAYLOAD_KEY = "EWB_PREVIOUS_DATA";
-const HEADER_KEY = "EWB_HEADER_DATA";
+const STORAGE_KEY = "BULK_DOCNUM_PAYLOAD";
 
-// Safe JSON load
+// Helper to read JSON safely
 const getJson = (key) => {
   try {
-    return JSON.parse(localStorage.getItem(key) || "{}");
+    return JSON.parse(localStorage.getItem(key) || "null");
   } catch {
-    return {};
+    return null;
   }
 };
 
 const BulkByDocNum = () => {
-  // -----------------------------------------
-  // HEADER STATE (companyId, token, product)
-  // -----------------------------------------
+  const login = getJson(LOGIN_KEY) || {};
+  const latest = getJson(LATEST_EWB_KEY) || {};
+  const saved = getJson(STORAGE_KEY) || {};
+
+  // ---------------------------
+  // HEADERS
+  // ---------------------------
   const [headers, setHeaders] = useState({
-    companyId: "",
-    authToken: "",
+    companyId: login.companyId || "",
+    "X-Auth-Token": login.authToken || login.token || "",
     product: "TOPAZ",
+    Accept: "application/json",
+    "Content-Type": "application/json",
   });
 
-  // -----------------------------------------
-  // PAYLOAD STATE
-  // -----------------------------------------
+  // ---------------------------
+  // PAYLOAD
+  // ---------------------------
   const [payload, setPayload] = useState({
-    userGstin: "",
-    docType: "INV",
-    docNumList: [""],
+    userGstin:
+      latest?.fullApiResponse?.response?.fromGstin ||
+      saved?.userGstin ||
+      login?.gstin ||
+      "",
+    companyId: saved?.companyId || login?.companyId || "",
+    docType:
+      latest?.fullApiResponse?.response?.docType ||
+      saved?.docType ||
+      "INV",
+    docNumList:
+      latest?.fullApiResponse?.response?.docNumList ||
+      saved?.docNumList ||
+      [],
   });
 
-  const [payloadText, setPayloadText] = useState("");
-  const [response, setResponse] = useState(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
+  const [result, setResult] = useState(null);
+  const [error, setError] = useState(null);
 
-  // ============================================================
-  // 🔥 AUTOFILL EVERYTHING FROM LOGIN + LATEST EWB + SAVED DATA
-  // ============================================================
-  useEffect(() => {
-    const login = getJson(LOGIN_KEY);
-    const savedEwb = getJson(LATEST_EWB_KEY);
-    const savedHeader = getJson(HEADER_KEY);
-    const savedPayload = getJson(PAYLOAD_KEY);
+  const updatePayload = (key, value) => {
+    setPayload((prev) => ({ ...prev, [key]: value }));
+  };
 
-    // ------------------------------------
-    // AUTO-FILL HEADERS
-    // ------------------------------------
-    const newHeaders = {
-      companyId: savedHeader.companyId || login.companyId || "",
-      authToken: savedHeader.authToken || login.token || "",
-      product: savedHeader.product || "TOPAZ",
-    };
-    setHeaders(newHeaders);
+  const updateHeaders = (key, value) => {
+    setHeaders((prev) => ({ ...prev, [key]: value }));
+  };
 
-    // ------------------------------------
-    // AUTO-FILL userGstin (from latestEwb)
-    // ORDER:
-    //   fullApiResponse.response.fromGstin
-    //   savedEwb.fromGstin
-    //   savedPayload.userGstin
-    //   login.gstin
-    // ------------------------------------
-    let gstin =
-      savedEwb?.fullApiResponse?.response?.fromGstin ||
-      savedEwb?.fromGstin ||
-      savedPayload?.userGstin ||
-      login?.gstin ||
-      "";
+  const updateDocList = (value) => {
+    const list = value
+      .split(",")
+      .map((v) => v.trim())
+      .filter((v) => v.length);
 
-    // ------------------------------------
-    // AUTO-FILL docNumList
-    // ------------------------------------
-    let docNum =
-      savedEwb?.fullApiResponse?.response?.transDocNo ||
-      savedEwb?.transDocNo ||
-      savedPayload?.docNumList?.[0] ||
-      "";
+    setPayload((prev) => ({ ...prev, docNumList: list }));
+  };
 
-    const newPayload = {
-      userGstin: gstin,
-      docType: savedPayload.docType || "INV",
-      docNumList: [docNum],
-    };
+  // ---------------------------
+  // API CALL
+  // ---------------------------
+  const fetchData = async () => {
+    setError(null);
+    setResult(null);
 
-    setPayload(newPayload);
-    setPayloadText(JSON.stringify(newPayload, null, 2));
-  }, []);
-
-  // ============================================================
-  // JSON TEXT AREA EDITOR
-  // ============================================================
-  const handlePayloadChange = (text) => {
-    setPayloadText(text);
     try {
-      const parsed = JSON.parse(text);
-      setPayload(parsed);
-      setError("");
-      localStorage.setItem(PAYLOAD_KEY, JSON.stringify(parsed));
-    } catch {
-      setError("❌ Invalid JSON");
-    }
-  };
-
-  // ============================================================
-  // HEADER UPDATE
-  // ============================================================
-  const handleHeaderChange = (field, value) => {
-    const updated = { ...headers, [field]: value };
-    setHeaders(updated);
-    localStorage.setItem(HEADER_KEY, JSON.stringify(updated));
-  };
-
-  // ============================================================
-  // PAYLOAD FIELD UPDATE
-  // ============================================================
-  const handlePayloadField = (field, value) => {
-    const updated = { ...payload, [field]: value };
-    setPayload(updated);
-    localStorage.setItem(PAYLOAD_KEY, JSON.stringify(updated));
-    setPayloadText(JSON.stringify(updated, null, 2));
-  };
-
-  // ============================================================
-  // MULTIPLE DOC NUMBERS
-  // ============================================================
-  const handleDocNumChange = (index, value) => {
-    const list = [...payload.docNumList];
-    list[index] = value;
-    const updated = { ...payload, docNumList: list };
-    setPayload(updated);
-    localStorage.setItem(PAYLOAD_KEY, JSON.stringify(updated));
-    setPayloadText(JSON.stringify(updated, null, 2));
-  };
-
-  const addDocNumRow = () => {
-    const updated = {
-      ...payload,
-      docNumList: [...payload.docNumList, ""],
-    };
-    setPayload(updated);
-    localStorage.setItem(PAYLOAD_KEY, JSON.stringify(updated));
-    setPayloadText(JSON.stringify(updated, null, 2));
-  };
-
-  // ============================================================
-  // 🔥 SUBMIT API
-  // ============================================================
-  const handleSubmit = async () => {
-    try {
-      setLoading(true);
-      setResponse(null);
-
       const res = await axios.post(
-        "http://localhost:3001/proxy/topaz/ewb/bulkByDocNum",
+        "http://localhost:3001/proxy/topaz/ewb/docNum",
         payload,
-        {
-          headers: {
-            Accept: "application/json",
-            "Content-Type": "application/json",
-            companyId: headers.companyId,
-            "X-Auth-Token": headers.authToken,
-            product: headers.product,
-          },
-        }
+        { headers }
       );
 
-      setResponse(res.data);
+      setResult(res.data);
+
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
+      if (res.data?.response) {
+        localStorage.setItem(LATEST_EWB_KEY, JSON.stringify(res.data));
+      }
     } catch (err) {
-      setResponse(err.response?.data || err.message);
-    } finally {
-      setLoading(false);
+      setError(err.response?.data || err.message);
     }
   };
 
-  // ============================================================
-  // UI
-  // ============================================================
+  // ---------------------------
+  // COMPONENT UI
+  // ---------------------------
   return (
-    <div style={{ padding: 20, width: "700px" }}>
-      <h2>EWB Bulk Fetch (By Doc Number)</h2>
+    <div
+      style={{
+        maxWidth: 900,
+        margin: "30px auto",
+        fontFamily: "Arial",
+        padding: 20,
+      }}
+    >
+      <h2 style={{ marginBottom: 20, textAlign: "center" }}>
+        🚚 EWB Bulk Lookup by Document Number
+      </h2>
 
-      {/* ======================= HEADERS ======================= */}
-      <div style={{ background: "#f7f7f7", padding: 15, marginBottom: 20 }}>
-        <h3>Headers</h3>
+      {/* ----------------------------- */}
+      {/* PAYLOAD CARD */}
+      {/* ----------------------------- */}
+      <div
+        style={{
+          background: "#f7faff",
+          padding: 20,
+          borderRadius: 10,
+          boxShadow: "0 2px 6px rgba(0,0,0,0.1)",
+          marginBottom: 25,
+        }}
+      >
+        <h3 style={{ marginBottom: 15 }}>📦 Payload (POST Body)</h3>
 
-        <label>Company ID (Header)</label>
-        <input
-          value={headers.companyId}
-          onChange={(e) => handleHeaderChange("companyId", e.target.value)}
-          style={{ width: "100%", marginBottom: 10 }}
-        />
-
-        <label>X-Auth-Token</label>
-        <input
-          value={headers.authToken}
-          onChange={(e) => handleHeaderChange("authToken", e.target.value)}
-          style={{ width: "100%", marginBottom: 10 }}
-        />
-
-        <label>Product</label>
-        <input
-          value={headers.product}
-          onChange={(e) => handleHeaderChange("product", e.target.value)}
-          style={{ width: "100%" }}
-        />
-      </div>
-
-      {/* ======================= PAYLOAD ======================= */}
-      <div style={{ background: "#eef7ff", padding: 15 }}>
-        <h3>Payload</h3>
-
-        <label>User GSTIN:</label>
+        <label>GSTIN</label>
         <input
           value={payload.userGstin}
-          onChange={(e) => handlePayloadField("userGstin", e.target.value)}
-          style={{ width: "100%", marginBottom: 10 }}
+          onChange={(e) => updatePayload("userGstin", e.target.value)}
+          className="input"
+          style={inputStyle}
         />
 
-        <label>Doc Type:</label>
-        <select
+        <label>Company ID</label>
+        <input
+          value={payload.companyId}
+          onChange={(e) => updatePayload("companyId", e.target.value)}
+          style={inputStyle}
+        />
+
+        <label>Document Type (INV/BOE/DC/...)</label>
+        <input
           value={payload.docType}
-          onChange={(e) => handlePayloadField("docType", e.target.value)}
-          style={{ width: "100%", marginBottom: 10 }}
-        >
-          <option value="INV">INV</option>
-          <option value="BIL">BIL</option>
-          <option value="BOE">BOE</option>
-          <option value="CHL">CHL</option>
-          <option value="OTH">OTH</option>
-        </select>
+          onChange={(e) => updatePayload("docType", e.target.value)}
+          style={inputStyle}
+        />
 
-        <label>Document Numbers:</label>
-        {payload.docNumList.map((v, i) => (
-          <input
-            key={i}
-            value={v}
-            onChange={(e) => handleDocNumChange(i, e.target.value)}
-            style={{ width: "100%", marginBottom: 6 }}
-          />
-        ))}
+        <label>Document Numbers (comma separated)</label>
+        <input
+          value={payload.docNumList.join(", ")}
+          onChange={(e) => updateDocList(e.target.value)}
+          style={inputStyle}
+        />
 
-        <button onClick={addDocNumRow} style={{ marginTop: 10 }}>
-          + Add More
+        <button style={buttonStyle} onClick={fetchData}>
+          🔍 Fetch Details
         </button>
       </div>
 
-      {/* ======================= JSON EDITOR ======================= */}
-      <h3 style={{ marginTop: 20 }}>Payload JSON</h3>
-      <textarea
-        rows={12}
-        value={payloadText}
-        onChange={(e) => handlePayloadChange(e.target.value)}
-        style={{ width: "100%", fontFamily: "monospace" }}
-      />
-      {error && <p style={{ color: "red" }}>{error}</p>}
-
-      {/* ======================= SUBMIT ======================= */}
-      <button
-        onClick={handleSubmit}
-        disabled={loading}
-        style={{ marginTop: 20, padding: 10, fontSize: 16 }}
+      {/* ----------------------------- */}
+      {/* HEADERS CARD */}
+      {/* ----------------------------- */}
+      <div
+        style={{
+          background: "#fdf7e3",
+          padding: 20,
+          borderRadius: 10,
+          boxShadow: "0 2px 6px rgba(0,0,0,0.1)",
+          marginBottom: 25,
+        }}
       >
-        {loading ? "Submitting..." : "Submit"}
-      </button>
+        <h3 style={{ marginBottom: 15 }}>🧾 Headers</h3>
 
-      {/* ======================= RESPONSE ======================= */}
-      {response && (
-        <pre
-          style={{
-            background: "#eee",
-            marginTop: 20,
-            padding: 10,
-            borderRadius: 6,
-          }}
-        >
-          {JSON.stringify(response, null, 2)}
-        </pre>
-      )}
+        {Object.entries(headers).map(([key, value]) => (
+          <div key={key} style={{ marginBottom: 12 }}>
+            <label>{key}</label>
+            <input
+              value={value}
+              onChange={(e) => updateHeaders(key, e.target.value)}
+              style={inputStyle}
+            />
+          </div>
+        ))}
+      </div>
+
+      {/* ----------------------------- */}
+      {/* PAYLOAD JSON */}
+      {/* ----------------------------- */}
+      <div style={{ marginBottom: 20 }}>
+        <h3>📤 Final POST Payload</h3>
+        <pre style={payloadBox}>{JSON.stringify(payload, null, 2)}</pre>
+      </div>
+
+      {/* ----------------------------- */}
+      {/* API RESPONSE */}
+      {/* ----------------------------- */}
+      <h3>📥 API Response</h3>
+
+      {error && <pre style={errorBox}>{JSON.stringify(error, null, 2)}</pre>}
+      {result && <pre style={responseBox}>{JSON.stringify(result, null, 2)}</pre>}
     </div>
   );
+};
+
+// ---------------------------
+// Reusable Styles
+// ---------------------------
+const inputStyle = {
+  width: "100%",
+  padding: "10px",
+  marginTop: 5,
+  marginBottom: 15,
+  borderRadius: 6,
+  border: "1px solid #ccc",
+  fontSize: 14,
+};
+
+const buttonStyle = {
+  padding: "12px 20px",
+  width: "100%",
+  borderRadius: 8,
+  background: "#1976d2",
+  color: "#fff",
+  border: "none",
+  cursor: "pointer",
+  marginTop: 10,
+  fontSize: 16,
+};
+
+const payloadBox = {
+  background: "#fffce0",
+  padding: 15,
+  borderRadius: 8,
+  whiteSpace: "pre-wrap",
+};
+
+const responseBox = {
+  background: "#e9f2ff",
+  padding: 15,
+  borderRadius: 8,
+};
+
+const errorBox = {
+  background: "#ffe6e6",
+  padding: 15,
+  borderRadius: 8,
+  color: "red",
 };
 
 export default BulkByDocNum;

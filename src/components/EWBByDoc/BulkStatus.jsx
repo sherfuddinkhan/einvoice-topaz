@@ -1,227 +1,207 @@
 import React, { useState, useEffect } from "react";
 import axios from "axios";
 
-// ─────────────────────────────────────────────
-// LocalStorage Keys
-// ─────────────────────────────────────────────
-const LOGIN_KEY = "iris_login_data";
-const LATEST_EWB_KEY = "latestEwbData";
-const HEADER_KEY = "BULK_HEADER";
-const DOC_LIST_KEY = "BULK_DOC_LIST";
-const QUERY_KEY = "BULK_QUERY";
+const DEFAULT_PROXY_STATUS = "http://localhost:3001/proxy/topaz/ewb/bulkStatus";
+const DEFAULT_PROXY_DOWNLOAD = "http://localhost:3001/proxy/topaz/ewb/bulkDownload";
+
+const LS_KEYS = {
+  HEADER_COMPANY: "ewb_headerCompanyId",
+  QUERY_COMPANY: "ewb_queryCompanyId",
+  GSTIN: "ewb_userGstin",
+  TOKEN: "iris_login_token",
+};
 
 const BulkStatus = () => {
-  // ========== HEADERS (ONLY HEADER COMPANYID ALLOWED) ==========
   const [headers, setHeaders] = useState({
     companyId: "",
     authToken: "",
     product: "TOPAZ",
   });
 
-  // ========== QUERY PARAMS ==========
   const [query, setQuery] = useState({
+    companyId: "",
     userGstin: "",
-    docNumList: [],
   });
 
   const [response, setResponse] = useState(null);
   const [loading, setLoading] = useState(false);
 
-  // ─────────────────────────────────────────────
-  // 🔥 AUTOPOPULATE GSTIN + DOC NUMBER LIST
-  // ─────────────────────────────────────────────
+  // ----------------------------
+  // Auto-populate headers and query
+  // ----------------------------
   useEffect(() => {
-    const login = JSON.parse(localStorage.getItem(LOGIN_KEY) || "{}");
-    const savedHeader = JSON.parse(localStorage.getItem(HEADER_KEY) || "{}");
-    const savedQuery = JSON.parse(localStorage.getItem(QUERY_KEY) || "{}");
-    const savedDocs = JSON.parse(localStorage.getItem(DOC_LIST_KEY) || "[]");
-    const latest = JSON.parse(localStorage.getItem(LATEST_EWB_KEY) || "{}");
+    const loginData = JSON.parse(localStorage.getItem("iris_login_data") || "{}");
 
-    // ---------------------------
-    // AUTOFILL HEADERS
-    // ---------------------------
+    const headerCompanyId = localStorage.getItem(LS_KEYS.HEADER_COMPANY) || loginData.companyId || "4";
+    const queryCompanyId = localStorage.getItem(LS_KEYS.QUERY_COMPANY) || "13";
+    const userGstin = localStorage.getItem(LS_KEYS.GSTIN) || loginData.gstin || "05AAAAU1183B5ZW";
+    const token = loginData.authToken || loginData.token || localStorage.getItem(LS_KEYS.TOKEN) || "";
+
     setHeaders({
-      companyId: savedHeader.companyId || login.companyId || "",
-      authToken: savedHeader.authToken || login.token || "",
-      product: savedHeader.product || "TOPAZ",
+      companyId: headerCompanyId,
+      authToken: token,
+      product: "TOPAZ",
     });
 
-    // ---------------------------
-    // AUTOFILL GSTIN LOGIC
-    // Priority:
-    // 1. latestEwb.fullApiResponse.response.fromGstin
-    // 2. savedQuery.userGstin
-    // 3. login.gstin
-    // ---------------------------
-    let autoGstin =
-      latest?.fullApiResponse?.response?.fromGstin ||
-      latest?.fromGstin ||
-      savedQuery?.userGstin ||
-      login?.gstin ||
-      "";
-
-    // ---------------------------
-    // AUTOFILL DOC NUMBER LIST
-    // Priority:
-    // 1. latestEwb.fullApiResponse.response.docNumList
-    // 2. savedDocs
-    // 3. savedQuery.docNumList
-    // ---------------------------
-    let autoDocList = [];
-
-    if (Array.isArray(latest?.docNumList)) {
-      autoDocList = latest.docNumList; // direct array
-    } else if (latest?.fullApiResponse?.response?.transDocNo) {
-      autoDocList = [latest.fullApiResponse.response.transDocNo];
-    } else if (savedDocs.length > 0) {
-      autoDocList = savedDocs;
-    } else if (savedQuery?.docNumList?.length > 0) {
-      autoDocList = savedQuery.docNumList;
-    }
-
-    // Final Set
     setQuery({
-      userGstin: autoGstin,
-      docNumList: autoDocList,
+      companyId: queryCompanyId,
+      userGstin,
     });
   }, []);
 
-  // ─────────────────────────────────────────────
-  // INPUT HANDLERS
-  // ─────────────────────────────────────────────
-
-  const handleHeaderChange = (name, value) => {
-    const updated = { ...headers, [name]: value };
-    setHeaders(updated);
-    localStorage.setItem(HEADER_KEY, JSON.stringify(updated));
+  // ----------------------------
+  // Input handlers
+  // ----------------------------
+  const handleHeaderChange = (key, value) => {
+    setHeaders((prev) => ({ ...prev, [key]: value }));
   };
 
-  const handleQueryChange = (name, value) => {
-    const updated = { ...query, [name]: value };
-    setQuery(updated);
-    localStorage.setItem(QUERY_KEY, JSON.stringify(updated));
+  const handleQueryChange = (key, value) => {
+    setQuery((prev) => ({ ...prev, [key]: value }));
   };
 
-  const handleDocListChange = (value) => {
-    const list = value
-      .split(",")
-      .map((v) => v.trim())
-      .filter((v) => v !== "");
-    setQuery({ ...query, docNumList: list });
-    localStorage.setItem(DOC_LIST_KEY, JSON.stringify(list));
-  };
-
-  // ─────────────────────────────────────────────
-  // API CALL
-  // ─────────────────────────────────────────────
+  // ----------------------------
+  // Fetch Bulk Status
+  // ----------------------------
   const fetchStatus = async () => {
-    try {
-      setLoading(true);
-      setResponse(null);
+    setLoading(true);
+    setResponse(null);
 
-      const res = await axios.get(
-        "http://localhost:3001/proxy/topaz/ewb/bulkStatus",
-        {
-          params: {
-            userGstin: query.userGstin,
-            docNumList: query.docNumList,
-          },
-          headers: {
-            Accept: "application/json",
-            product: headers.product,
-            companyId: headers.companyId, // ONLY IN HEADER
-            "X-Auth-Token": headers.authToken,
-          },
-        }
-      );
+    try {
+      const res = await axios.get(DEFAULT_PROXY_STATUS, {
+        params: {
+          companyId: query.companyId, // Query Param companyId
+          userGstin: query.userGstin,
+        },
+        headers: {
+          Accept: "application/json",
+          product: headers.product,
+          "X-Auth-Token": headers.authToken,
+          companyId: headers.companyId, // Header companyId
+        },
+      });
 
       setResponse(res.data);
     } catch (err) {
-      setResponse(err.response?.data || err.message);
-    } finally {
-      setLoading(false);
+      setResponse(err.response?.data || { status: "ERROR", message: err.message });
+    }
+
+    setLoading(false);
+  };
+
+  // ----------------------------
+  // Download EWB by ID
+  // ----------------------------
+  const handleDownload = async () => {
+    if (!response?.response?.id) return alert("No valid EWB ID to download");
+
+    try {
+      const res = await axios.get(DEFAULT_PROXY_DOWNLOAD, {
+        params: { id: response.response.id },
+        headers: {
+          Accept: "application/json",
+          "X-Auth-Token": headers.authToken,
+          companyId: headers.companyId,
+          product: headers.product,
+        },
+        responseType: "blob",
+      });
+
+      const contentDisposition = res.headers["content-disposition"];
+      const fileName =
+        contentDisposition?.split("filename=")[1]?.replace(/"/g, "") ||
+        `EWB_${response.response.id}`;
+
+      const url = window.URL.createObjectURL(res.data);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = fileName;
+      link.click();
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      alert(err?.response?.data || err.message || "Error downloading file");
     }
   };
 
-  // ─────────────────────────────────────────────
-  // UI
-  // ─────────────────────────────────────────────
   return (
-    <div style={{ padding: 20, width: 800 }}>
-      <h2>EWB Bulk Status Checker</h2>
+    <div style={{ maxWidth: 900, margin: "20px auto", fontFamily: "Arial", padding: 20 }}>
+      <h2>Bulk EWB Status Lookup</h2>
 
-      {/* HEADERS */}
-      <div style={{ background: "#fafafa", padding: 15, borderRadius: 8 }}>
-        <h3>Headers</h3>
-
-        <label>Company ID</label>
-        <input
-          value={headers.companyId}
-          onChange={(e) => handleHeaderChange("companyId", e.target.value)}
-          style={{ width: "100%", marginBottom: 10 }}
-        />
-
+      {/* Headers */}
+      <div style={styles.card}>
+        <h4>Headers</h4>
+        <label>Header Company ID</label>
+        <input style={styles.input} value={headers.companyId} onChange={(e) => handleHeaderChange("companyId", e.target.value)} />
         <label>X-Auth-Token</label>
-        <input
-          value={headers.authToken}
-          onChange={(e) => handleHeaderChange("authToken", e.target.value)}
-          style={{ width: "100%", marginBottom: 10 }}
-        />
-
+        <input style={styles.input} value={headers.authToken} readOnly />
         <label>Product</label>
-        <input
-          value={headers.product}
-          onChange={(e) => handleHeaderChange("product", e.target.value)}
-          style={{ width: "100%" }}
-        />
+        <input style={styles.input} value={headers.product} readOnly />
       </div>
 
-      {/* QUERY PARAMS */}
-      <div style={{ background: "#e9f4ff", padding: 15, marginTop: 20, borderRadius: 8 }}>
-        <h3>Query Params</h3>
-
+      {/* Query */}
+      <div style={styles.card}>
+        <h4>Query Params</h4>
         <label>User GSTIN</label>
-        <input
-          value={query.userGstin}
-          onChange={(e) => handleQueryChange("userGstin", e.target.value)}
-          style={{ width: "100%", marginBottom: 10 }}
-        />
-
-        <label>Document Numbers (comma-separated)</label>
-        <input
-          value={query.docNumList.join(", ")}
-          onChange={(e) => handleDocListChange(e.target.value)}
-          style={{ width: "100%" }}
-        />
+        <input style={styles.input} value={query.userGstin} onChange={(e) => handleQueryChange("userGstin", e.target.value)} />
+        <label>Query Company ID</label>
+        <input style={styles.input} value={query.companyId} onChange={(e) => handleQueryChange("companyId", e.target.value)} />
       </div>
 
-      {/* SUBMIT */}
-      <button
-        onClick={fetchStatus}
-        disabled={loading}
-        style={{
-          marginTop: 20,
-          padding: "10px 20px",
-          fontSize: 16,
-        }}
-      >
-        {loading ? "Checking..." : "Check Bulk Status"}
+      <button onClick={fetchStatus} disabled={loading} style={styles.button}>
+        {loading ? "Fetching..." : "Fetch Bulk Status"}
       </button>
 
-      {/* RESPONSE */}
+      {/* Response */}
       {response && (
-        <pre style={{ marginTop: 20, background: "#eee", padding: 10, borderRadius: 6 }}>
-          {JSON.stringify(response, null, 2)}
-        </pre>
+        <div style={{ marginTop: 20 }}>
+          <h4>Response Body</h4>
+          <pre style={styles.pre}>{JSON.stringify(response, null, 2)}</pre>
+
+          {response?.response?.id && (
+            <button onClick={handleDownload} style={{ ...styles.button, marginTop: 10, background: "#28a745" }}>
+              Download EWB File
+            </button>
+          )}
+        </div>
       )}
 
-      {/* FINAL PAYLOAD SHOWN */}
-      <h3>Final Payload Sent</h3>
-      <pre style={{ background: "#fff4d1", padding: 10, borderRadius: 6 }}>
-        {JSON.stringify({ headers, queryParams: query }, null, 2)}
-      </pre>
+      <h4>Final Payload Sent</h4>
+      <pre style={styles.pre}>{JSON.stringify({ headers, queryParams: query }, null, 2)}</pre>
     </div>
   );
+};
+
+const styles = {
+  card: {
+    background: "#f9f9f9",
+    padding: 14,
+    marginBottom: 12,
+    borderRadius: 8,
+    border: "1px solid #ddd",
+  },
+  input: {
+    width: "100%",
+    padding: 8,
+    borderRadius: 6,
+    border: "1px solid #ccc",
+    marginBottom: 8,
+  },
+  button: {
+    padding: "10px 20px",
+    fontSize: 16,
+    borderRadius: 6,
+    border: "none",
+    background: "#0078ff",
+    color: "#fff",
+    cursor: "pointer",
+  },
+  pre: {
+    background: "#f4f4f4",
+    padding: 12,
+    borderRadius: 6,
+    maxHeight: 400,
+    overflow: "auto",
+  },
 };
 
 export default BulkStatus;
