@@ -404,7 +404,7 @@ app.put('/proxy/mgmt/company/business', (req, res) => {
 // =====================
 app.get('/proxy/mgmt/businessHierarchy', (req, res) => {
   proxyRequest(res, () =>
-    axios.get(`${BASE_URL}/mgmt/company/businesshierarchy`, {
+    axios.get(`${BASE_URL}/irisgst/mgmt/company/businesshierarchy`, {
       params: req.query,
       headers: {
         Accept: 'application/json',
@@ -418,14 +418,24 @@ app.get('/proxy/mgmt/businessHierarchy', (req, res) => {
 // =====================
 // Get Assigned Places of Business (POB)
 // =====================
-app.get('/proxy/mgmt/pob/list', (req, res) => {
-  proxyRequest(res, () =>
-    axios.get(`${BASE_URL}/mgmt/user/getAssignedPlaceOfBusinesses`, {
-      params: req.query,
-      headers: { Accept: 'application/json', ...authHeaders(req) },
+// Backend: proxy for Assigned POB API
+// server.js or routes file
+app.get("/proxy/mgmt/pob/list", (req, res) => {
+  axios
+    .get(`${BASE_URL}/irisgst/mgmt/user/getAssignedPlaceOfBusinesses`, {
+      params: req.query, // lowercase companyid
+      headers: { Accept: "application/json", ...authHeaders(req) },
     })
-  );
-});
+    .then((response) => res.json(response.data))
+    .catch((err) => {
+      console.error(err.message);
+      if (err.response) res.status(err.response.status).send(err.response.data);
+      else res.status(500).send({ status: "ERROR", message: err.message });
+    });
+});;
+
+
+
 
 // =====================
 // Get Assigned GSTINs for Filing Business

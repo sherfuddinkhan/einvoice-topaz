@@ -3,56 +3,42 @@ import axios from "axios";
 
 const STORAGE_KEY = "iris_einvoice_shared_config";
 const LOGIN_RESPONSE_KEY = "iris_login_data";
+const DEFAULT_PROXY = "http://localhost:3001/proxy/mgmt/pob/list";
 
 const AssignedPOB = () => {
-  const savedConfig = JSON.parse(localStorage.getItem(LOGIN_RESPONSE_KEY) || "{}");
+  const savedLogin = JSON.parse(localStorage.getItem(LOGIN_RESPONSE_KEY) || "{}");
 
-  const [config, setConfig] = useState({
-    proxyBase: "http://localhost:3001/proxy",
-    endpoint: "/mgmt/pob/list", // ✔ correct proxy path
-
-    headers: {
-      Accept: "application/json",
-      companyId: savedConfig?.companyId || savedConfig?.companyId || "",
-      "X-Auth-Token":
-        savedConfig?.token || savedConfig?.token || "",
-      product: "TOPAZ",
-    },
-
-    queryCompanyId:
-     savedConfig?.companyId || savedConfig?.companyId || "",
+  const [headers, setHeaders] = useState({
+    Accept: "application/json",
+    companyId: savedLogin.companyId || "4", // Header companyId
+    "X-Auth-Token": savedLogin.token || "", // token
+    product: "TOPAZ",
   });
+
+  const [queryCompanyId, setQueryCompanyId] = useState("13"); // Query param companyid
 
   const [pobList, setPobList] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [rawResponse, setRawResponse] = useState(null);
 
-  // Save companyId & token automatically
+  // Save header info automatically
   useEffect(() => {
     localStorage.setItem(
       STORAGE_KEY,
       JSON.stringify({
-        companyId: config.headers.companyId,
-        token: config.headers["X-Auth-Token"],
+        companyId: headers.companyId,
+        token: headers["X-Auth-Token"],
       })
     );
-  }, [config.headers]);
+  }, [headers]);
 
-  const updateHeader = (key, value) => {
-    setConfig((prev) => ({
-      ...prev,
-      headers: { ...prev.headers, [key]: value },
-    }));
-  };
-
-  const updateQuery = (value) => {
-    setConfig((prev) => ({ ...prev, queryCompanyId: value }));
-  };
+  const updateHeader = (key, value) => setHeaders((prev) => ({ ...prev, [key]: value }));
+  const updateQuery = (value) => setQueryCompanyId(value);
 
   const fetchPOBList = async () => {
-    if (!config.queryCompanyId) {
-      setError("Company ID is required");
+    if (!queryCompanyId) {
+      setError("Query Param 'companyid' is required");
       return;
     }
 
@@ -61,11 +47,10 @@ const AssignedPOB = () => {
     setPobList([]);
     setRawResponse(null);
 
-    const finalURL = `${config.proxyBase}${config.endpoint}?companyId=${config.queryCompanyId}`;
-
     try {
-      const res = await axios.get(finalURL, {
-        headers: config.headers,
+      const res = await axios.get(DEFAULT_PROXY, {
+        params: { companyid: queryCompanyId }, // API expects lowercase 'companyid'
+        headers,
       });
 
       setRawResponse(res.data);
@@ -73,7 +58,7 @@ const AssignedPOB = () => {
       if (res.data.status === "SUCCESS" && Array.isArray(res.data.response)) {
         setPobList(res.data.response);
       } else {
-        setError("Failed to fetch assigned places of business");
+        setError("Failed to fetch assigned POBs");
       }
     } catch (err) {
       setError(err.message || "Request failed");
@@ -83,27 +68,25 @@ const AssignedPOB = () => {
     }
   };
 
-  const finalURL = `${config.proxyBase}${config.endpoint}?companyId=${config.queryCompanyId}`;
+  const finalURL = `${DEFAULT_PROXY}?companyid=${queryCompanyId}`;
 
   return (
     <div style={{ padding: 20 }}>
       <h2>Assigned Place of Businesses</h2>
 
       <div>
-        <label>Query Param (companyId):</label>
+        <label>Query Param (companyid): </label>
         <input
-          value={config.queryCompanyId}
+          value={queryCompanyId}
           onChange={(e) => updateQuery(e.target.value)}
           style={{ padding: 6, marginLeft: 10 }}
         />
       </div>
 
       <h3>Headers (Editable)</h3>
-      {Object.entries(config.headers).map(([key, value]) => (
+      {Object.entries(headers).map(([key, value]) => (
         <div key={key} style={{ marginBottom: 10 }}>
-          <label style={{ width: 140, display: "inline-block" }}>
-            {key}:
-          </label>
+          <label style={{ width: 140, display: "inline-block" }}>{key}:</label>
           <input
             type={key === "X-Auth-Token" ? "password" : "text"}
             value={value}
@@ -139,15 +122,11 @@ const AssignedPOB = () => {
       {rawResponse && (
         <div style={{ marginTop: 20 }}>
           <h3>Raw Response</h3>
-          <pre style={{ background: "#eee", padding: 10 }}>
-            {JSON.stringify(rawResponse, null, 2)}
-          </pre>
+          <pre style={{ background: "#eee", padding: 10 }}>{JSON.stringify(rawResponse, null, 2)}</pre>
         </div>
       )}
 
-      <div style={{ marginTop: 10, fontSize: 12, color: "#666" }}>
-        Request URL: {finalURL}
-      </div>
+      <div style={{ marginTop: 10, fontSize: 12, color: "#666" }}>Request URL: {finalURL}</div>
     </div>
   );
 };

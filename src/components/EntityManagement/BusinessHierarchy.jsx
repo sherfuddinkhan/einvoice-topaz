@@ -1,27 +1,25 @@
-// BusinessHierarchyForm.js
 import React, { useState, useEffect } from "react";
+import axios from "axios";
 
 const STORAGE_KEY = "iris_einvoice_shared_config";
 const LOGIN_RESPONSE_KEY = "iris_login_data";
-const login = JSON.parse(localStorage.getItem(LOGIN_RESPONSE_KEY) || "{}");
+const DEFAULT_PROXY = "http://localhost:3001/proxy/mgmt/businessHierarchy";
+
 const BusinessHierarchy = () => {
-  const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || "{}");
+  const savedLogin = JSON.parse(localStorage.getItem(LOGIN_RESPONSE_KEY) || "{}");
+  const savedConfig = JSON.parse(localStorage.getItem(STORAGE_KEY) || "{}");
 
-  const [config, setConfig] = useState({
-    proxyBase: "http://localhost:3001/proxy",
-    endpoint: "/mgmt/businessHierarchy", // <-- proxy endpoint
-
-    headers: {
-      Accept: "application/json",
-      companyId: login?.companyId || saved?.companyId || "",
-      "X-Auth-Token": login.token || saved?.token || "",
-      product: "TOPAZ",
-    },
-    queryCompanyId: login?.companyId || saved?.companyId || "",
+  const [headers, setHeaders] = useState({
+    Accept: "application/json",
+    companyId: savedLogin.companyId || savedConfig.companyId || "4",
+    "X-Auth-Token": savedLogin.token || savedConfig.token || "",
+    product: "TOPAZ",
   });
 
-  const [rawResponse, setRawResponse] = useState(null);
+  const [queryCompanyId, setQueryCompanyId] = useState(savedLogin.companyId || savedConfig.companyId || "13");
+
   const [businessData, setBusinessData] = useState(null);
+  const [rawResponse, setRawResponse] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
@@ -30,66 +28,49 @@ const BusinessHierarchy = () => {
     localStorage.setItem(
       STORAGE_KEY,
       JSON.stringify({
-        companyId: config.headers.companyId,
-        token: config.headers["X-Auth-Token"],
+        companyId: headers.companyId,
+        token: headers["X-Auth-Token"],
       })
     );
-  }, [config]);
+  }, [headers]);
 
-  const updateHeader = (key, value) =>
-    setConfig((prev) => ({
-      ...prev,
-      headers: { ...prev.headers, [key]: value },
-    }));
+  const updateHeader = (key, value) => setHeaders((prev) => ({ ...prev, [key]: value }));
+  const updateQuery = (value) => setQueryCompanyId(value);
 
-  const updateQuery = (value) =>
-    setConfig((prev) => ({ ...prev, queryCompanyId: value }));
+  const fetchBusinessHierarchy = async () => {
+    if (!queryCompanyId) {
+      setError("Query Param 'companyid' is required");
+      return;
+    }
 
-  // API call via proxy
-  const sendRequest = async () => {
     setLoading(true);
     setError("");
     setBusinessData(null);
     setRawResponse(null);
 
-    const finalURL = `${config.proxyBase}${config.endpoint}?companyid=${config.queryCompanyId}`;
-
     try {
-      const res = await fetch(finalURL, {
-        method: "GET",
-        headers: config.headers,
+      const res = await axios.get(DEFAULT_PROXY, {
+        params: { companyid: queryCompanyId },
+        headers,
       });
 
-      const text = await res.text();
-      let json = null;
-      try {
-        json = JSON.parse(text);
-      } catch (_) {}
+      setRawResponse(res.data);
 
-      setRawResponse({
-        status: res.status,
-        statusText: res.statusText,
-        headers: Object.fromEntries(res.headers.entries()),
-        body: json || text,
-        time: new Date().toLocaleString("en-IN", { timeZone: "Asia/Kolkata" }),
-      });
-
-      if (res.ok && json?.status === "SUCCESS") {
-        setBusinessData(json.response);
+      if (res.data.status === "SUCCESS") {
+        setBusinessData(res.data.response);
       } else {
-        setError(json?.message || "Invalid Response");
+        setError(res.data.message || "Failed to fetch business hierarchy");
       }
     } catch (err) {
-      setError(err.message || "Request Failed");
+      setError(err.response?.data?.message || err.message || "Request failed");
+      setRawResponse(err.response?.data || null);
     } finally {
       setLoading(false);
     }
   };
 
-  const finalURL = `${config.proxyBase}${config.endpoint}?companyid=${config.queryCompanyId}`;
-
   const renderCompanyNode = (company) => (
-    <li style={{ margin: "10px 0" }}>
+    <li key={company.companyId} style={{ margin: "10px 0" }}>
       <div style={{ fontWeight: "bold" }}>
         {company.companyName} ({company.entityType})
       </div>
@@ -104,42 +85,26 @@ const BusinessHierarchy = () => {
     </li>
   );
 
+  const finalURL = `${DEFAULT_PROXY}?companyid=${queryCompanyId}`;
+
   return (
     <div style={{ padding: 30, fontFamily: "Arial", background: "#f4f4f4" }}>
       <div style={{ background: "white", padding: 20, borderRadius: 10 }}>
-        <h2>Business Hierarchy (Debug Panel)</h2>
+        <h2>Business Hierarchy</h2>
 
-        <b>Request URL:</b>
-        <div
-          style={{
-            background: "#eee",
-            padding: 10,
-            fontFamily: "monospace",
-            marginTop: 6,
-            borderRadius: 6,
-          }}
-        >
-          {finalURL}
+        <div>
+          <label>Query Param (companyid): </label>
+          <input
+            value={queryCompanyId}
+            onChange={(e) => updateQuery(e.target.value)}
+            style={{ padding: 8, marginLeft: 10, width: 200 }}
+          />
         </div>
 
-        <h3>Query Parameter</h3>
-        <label>companyid (query):</label>
-        <input
-          value={config.queryCompanyId}
-          onChange={(e) => updateQuery(e.target.value)}
-          style={{ padding: 8, marginLeft: 10, width: 200 }}
-        />
-
         <h3>Headers</h3>
-        {Object.entries(config.headers).map(([key, value]) => (
+        {Object.entries(headers).map(([key, value]) => (
           <div key={key} style={{ marginBottom: 10 }}>
-            <label
-              style={{
-                width: 140,
-                display: "inline-block",
-                fontWeight: "bold",
-              }}
-            >
+            <label style={{ width: 140, display: "inline-block", fontWeight: "bold" }}>
               {key}:
             </label>
             <input
@@ -152,7 +117,7 @@ const BusinessHierarchy = () => {
         ))}
 
         <button
-          onClick={sendRequest}
+          onClick={fetchBusinessHierarchy}
           disabled={loading}
           style={{
             padding: "10px 20px",
@@ -163,57 +128,29 @@ const BusinessHierarchy = () => {
             marginTop: 10,
           }}
         >
-          {loading ? "Loading..." : "Send Request"}
+          {loading ? "Loading..." : "Fetch Business Hierarchy"}
         </button>
+
+        <div style={{ marginTop: 10, fontSize: 12, color: "#666" }}>Request URL: {finalURL}</div>
       </div>
 
+      {error && (
+        <div style={{ background: "#ffcdd2", padding: 12, marginTop: 20, color: "#b71c1c" }}>
+          {error}
+        </div>
+      )}
+
       {rawResponse && (
-        <div
-          style={{
-            background: "#fff8e1",
-            padding: 20,
-            marginTop: 20,
-            borderRadius: 10,
-          }}
-        >
+        <div style={{ background: "#fff8e1", padding: 20, marginTop: 20, borderRadius: 10 }}>
           <h3>Raw Response</h3>
-          <pre
-            style={{
-              background: "#222",
-              color: "#0f0",
-              padding: 15,
-              borderRadius: 6,
-              maxHeight: 400,
-              overflow: "auto",
-            }}
-          >
+          <pre style={{ background: "#222", color: "#0f0", padding: 15, borderRadius: 6, maxHeight: 400, overflow: "auto" }}>
             {JSON.stringify(rawResponse, null, 2)}
           </pre>
         </div>
       )}
 
-      {error && (
-        <div
-          style={{
-            background: "#ffcdd2",
-            padding: 12,
-            marginTop: 20,
-            color: "#b71c1c",
-          }}
-        >
-          {error}
-        </div>
-      )}
-
       {businessData && (
-        <div
-          style={{
-            background: "white",
-            padding: 20,
-            marginTop: 20,
-            borderRadius: 10,
-          }}
-        >
+        <div style={{ background: "white", padding: 20, marginTop: 20, borderRadius: 10 }}>
           <h3>Business Hierarchy Tree</h3>
           <ul>{renderCompanyNode(businessData)}</ul>
         </div>
