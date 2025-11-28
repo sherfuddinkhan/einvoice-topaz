@@ -18,22 +18,13 @@ const getLocalStorageData = (key) => {
 
 const CEWBDetails = () => {
   const [authData, setAuthData] = useState({ token: "", companyId: "", userGstin: "" });
-  const [headers, setHeaders] = useState({
-    "X-Auth-Token": "",
-    companyId: "",
-    product: "TOPAZ",
-    "Content-Type": "application/json",
-    accept: "application/json",
-  });
+  const [headers, setHeaders] = useState({});
   const [payload, setPayload] = useState({});
   const [payloadText, setPayloadText] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [response, setResponse] = useState(null);
 
-  // --------------------------
-  // AUTO POPULATE on mount
-  // --------------------------
   useEffect(() => {
     const login = getLocalStorageData(LOGIN_RESPONSE_KEY);
     const savedEwbData = getLocalStorageData(LATEST_EWB_KEY);
@@ -42,20 +33,16 @@ const CEWBDetails = () => {
     console.log("🔎 savedEwbData:", savedEwbData);
 
     // --------------------------
-    // Extract
+    // Extract authentication info
     // --------------------------
-    const gstin = savedEwbData?.response?.fromGstin || login.userGstin || "";
     const companyId = login.companyId || 7;
     const token = login.token || "";
-
-    console.log("➡ GSTIN:", gstin);
-    console.log("➡ CompanyId:", companyId);
-    console.log("➡ Token:", token);
+    const gstin = savedEwbData?.response?.fromGstin || login.userGstin || "";
 
     setAuthData({ token, companyId, userGstin: gstin });
 
     // --------------------------
-    // Set Headers
+    // Set headers
     // --------------------------
     const headerObj = {
       "X-Auth-Token": token,
@@ -65,147 +52,90 @@ const CEWBDetails = () => {
       accept: "application/json",
     };
     setHeaders(headerObj);
-    console.log("📌 Headers:", headerObj);
 
     // --------------------------
-    let previousEwbs     = "";  // → tripSheetEwbBills
-    let previousGstin    = " ";  // → userGstin (sender's GSTIN)
-    let fromPlace        = "";
-    let fromStateCode    = "";
-    let transMode        = "";
-    let transDocDate     = "";
-    let transDocNo       = "";
-    let vehicleNo        = "";
+    // Extract fields from savedEwbData or vehicleDetails
+    // --------------------------
+    const vehicleDetail = savedEwbData?.vehicleDetails?.[0] || {};
 
-   let tripSheetEwbBills = [];
+    const tripSheetEwbBills =
+      Array.isArray(savedEwbData?.allEwbs)
+        ? savedEwbData.allEwbs.map((x) => x.ewbNo).filter(Boolean)
+        : [savedEwbData?.response?.ewbNo || savedEwbData?.ewbNo || vehicleDetail.ewbNo].filter(Boolean);
 
-    if (Array.isArray(savedEwbData.allEwbs)) {
-      previousEwbs = savedEwbData.allEwbs.map((x) => x.ewbNo).filter(Boolean);
-    } else if (savedEwbData?.response?.ewbNo) {
-      previousEwbs = [savedEwbData.response.ewbNo];
-    } else if (savedEwbData?.ewbNo) {
-     previousEwbs = [savedEwbData.ewbNo];
-    }
+    const previousGstin =
+      savedEwbData?.fullApiResponse?.response?.fromGstin ||
+      savedEwbData?.fromGstin ||
+      vehicleDetail?.fromGstin ||
+      "05AAAAU1183B5ZW";
 
-  // fallback
-if (previousEwbs.length === 0) previousEwbs = ["351010498047"];
+    const fromPlace =
+      savedEwbData?.fullApiResponse?.response?.fromPlace ||
+      savedEwbData?.fromPlace ||
+      vehicleDetail?.fromPlace ||
+      "Akhondiya";
 
+    const fromStateCode =
+      savedEwbData?.fullApiResponse?.response?.fromStateCode ||
+      savedEwbData?.fromStateCode ||
+      vehicleDetail?.fromState ||
+      "5";
 
-    
-  // ───── Extract fromGstin → userGstin (as array) ─────
-if (savedEwbData?.fullApiResponse?.response?.fromGstin) {
-  previousGstin = savedEwbData.fullApiResponse.response.fromGstin;
-}
-else if (savedEwbData?.fromGstin) {
-  previousGstin = savedEwbData.fromGstin;
-}
+    const transDocNo =
+      savedEwbData?.fullApiResponse?.response?.transDocNo ||
+      savedEwbData?.transDocNo ||
+      vehicleDetail?.transDocNo ||
+      "1234";
 
-// Fallback GSTIN if still empty
-if (previousGstin.length === 0) {
-  previousGstin = "05AAAAU1183B5ZW"; // or your default like "351010498047" if preferred
-}
+    const transDocDate =
+      savedEwbData?.fullApiResponse?.response?.transDocDate ||
+      savedEwbData?.transDocDate ||
+      vehicleDetail?.transDocDate ||
+      "12/11/2025";
 
-  // ───── Extract place → fromplace (as array) ─────
-if (savedEwbData?.fullApiResponse?.response?.fromPlace) {
-  fromPlace= savedEwbData.fullApiResponse.response.fromPlace;
-}
-else if (savedEwbData?.fromPlace) {
-  fromPlace= savedEwbData.fromPlace;
-}
+    const vehicleNo =
+      savedEwbData?.response?.vehicleNo ||
+      savedEwbData?.vehicleNo ||
+      vehicleDetail?.vehicleNo ||
+      "RJ14CA9999";
 
-// Fallback GSTIN if still empty
-if (fromPlace.length === 0) {
-  fromPlace= "Akhondiya"; // or your default like "351010498047" if preferred
-}
-///////////////////////////////////////////////////
- // ───── Extract state → fromstate (as array) ─────
-if (savedEwbData?.fullApiResponse?.response?.fromStateCode) {
-  fromStateCode= savedEwbData.fullApiResponse.response.fromStateCode;
-}
-else if (savedEwbData?.fromStateCode) {
-  fromStateCode= savedEwbData.fromStateCode;
-}
+    const vehicleType =
+      savedEwbData?.response?.vehicleType ||
+      savedEwbData?.vehicleType ||
+      vehicleDetail?.vehicleType ||
+      "R";
 
-// Fallback GSTIN if still empty
-if (fromPlace.length === 0) {
-  fromStateCode= "5"; // or your default like "351010498047" if preferred
-}
-/////////////////////////////////
- // ───── Extract transDocNo→ transDocNo ─────
-if (savedEwbData?.fullApiResponse?.response?.transDocNo) {
- transDocNo= savedEwbData.fullApiResponse.response.transDocNo;
-}
-else if (savedEwbData?.transDocNo) {
-  transDocNo = savedEwbData.transDocNo;
-}
+    const transMode =
+      savedEwbData?.fullApiResponse?.response?.transMode ||
+      savedEwbData?.transMode ||
+      vehicleDetail?.transMode ||
+      "3";
 
-// Fallback GSTIN if still empty
-if (transDocNo.length === 0) {
-   transDocNo= "1234"; // or your default like "351010498047" if preferred
-}
-/////////////////////////////////
-if (savedEwbData?.fullApiResponse?.response?.transDocDate) {
- transDocDate= savedEwbData.fullApiResponse.response.transDocDate;
-}
-else if (savedEwbData?.transDocDate) {
-  transDocDate= savedEwbData.transDocDate;
-}
-
-// Fallback GSTIN if still empty
-if (transDocDate.length === 0) {
-  transDocDate= "12/11/2025"; // or your default like "351010498047" if preferred
-}
-//////////////////
-if (savedEwbData?.payloadUsed?.vehicleNo) 
-  {
-  vehicleNo= savedEwbData.payloadUsed.vehicleNo;
-}
-else if (savedEwbData?.vehicleNo) {
-  vehicleNo=savedEwbData.vehicleNo;
-}
-
-// Fallback GSTIN if still empty
-if (vehicleNo.length === 0) {
-  vehicleNo = "10092"; // or your default like "351010498047" if preferred
-}
-////////////////////////
-if (savedEwbData?.fullApiResponse?.response?.transMode) {
-  transMode= savedEwbData.fullApiResponse.response.transMode;
-}
-else if (savedEwbData?.transMode) {
-  transMode= savedEwbData.transMode;
-}
-// Fallback GSTIN if still empty
-if (transMode.transMode === 0) {
-  transMode= "3"; // or your default like "351010498047" if preferred
-}
-
-    console.log("📌 tripSheetEwbBills:", previousEwbs);
+    console.log("📌 tripSheetEwbBills:", tripSheetEwbBills);
     console.log("📌 userGstin:", previousGstin);
     console.log("📌 fromPlace:", fromPlace);
-    console.log("📌 fromStateCode", fromStateCode);
-    console.log("📌 transMode", transMode);
-    console.log("📌 transDocDate ", transDocDate );
-    console.log("📌 transDocNo", transDocNo);
-    console.log("📌vehicleNo", vehicleNo);
-    // --------------------------
-    // Build Payload (using response.* fields)
-    // --------------------------
-    const r = savedEwbData.response || {};
+    console.log("📌 fromStateCode:", fromStateCode);
+    console.log("📌 transMode:", transMode);
+    console.log("📌 transDocDate:", transDocDate);
+    console.log("📌 transDocNo:", transDocNo);
+    console.log("📌 vehicleNo:", vehicleNo);
+    console.log("📌 vehicleType:", vehicleType);
 
+    // --------------------------
+    // Build initial payload
+    // --------------------------
     const initialPayload = {
-      fromPlace: fromPlace,
-      fromState: fromStateCode || 7,
-      vehicleNo: vehicleNo || "RJ14CA9999",
-      transMode: transMode,
-      transDocNo: transDocNo || "1212",
-      transDocDate: transDocDate || "15/11/2025",
-      tripSheetEwbBills: previousEwbs,
+      fromPlace,
+      fromState: fromStateCode,
+      vehicleNo,
+      vehicleType,
+      transMode,
+      transDocNo,
+      transDocDate,
+      tripSheetEwbBills,
       companyId,
       userGstin: previousGstin,
     };
-
-    console.log("📦 Payload:", initialPayload);
 
     setPayload(initialPayload);
     setPayloadText(JSON.stringify(initialPayload, null, 2));
@@ -217,8 +147,7 @@ if (transMode.transMode === 0) {
   const handlePayloadChange = (text) => {
     setPayloadText(text);
     try {
-      const parsed = JSON.parse(text);
-      setPayload(parsed);
+      setPayload(JSON.parse(text));
       setError("");
     } catch {
       setError("Invalid JSON");
@@ -230,7 +159,6 @@ if (transMode.transMode === 0) {
   // --------------------------
   const handleHeaderChange = (key, value) => {
     const updated = { ...headers, [key]: value };
-    console.log("✏ Updated Header:", updated);
     setHeaders(updated);
   };
 
@@ -238,46 +166,33 @@ if (transMode.transMode === 0) {
   // SUBMIT CEWB
   // --------------------------
   const handleSubmit = async () => {
-  setLoading(true);
-  setError("");
-  setResponse(null);
+    setLoading(true);
+    setError("");
+    setResponse(null);
 
-  try {
-    // 1️⃣ Call CEWB API
-    const res = await axios.post(
-      "http://localhost:3001/proxy/topaz/cewb/generate",
-      payload,
-      { headers }
-    );
+    try {
+      const res = await axios.post("http://localhost:3001/proxy/topaz/cewb/generate", payload, { headers });
+      console.log("🎉 CEWB Response:", res.data);
+      setResponse(res.data);
 
-    console.log("🎉 CEWB Response:", res.data);
-    setResponse(res.data);
+      // Save updated CEWB locally
+      const saved = getLocalStorageData(LATEST_EWB_KEY);
+      const allEwbs = [...(saved.allEwbs || [])];
 
-    // 2️⃣ Save updated CEWB locally
-    const saved = getLocalStorageData(LATEST_EWB_KEY);
-    const allEwbs = [...(saved.allEwbs || [])];
+      if (res.data.response?.cEwbNo) {
+        allEwbs.push({ ewbNo: res.data.response.cEwbNo });
+      }
 
-    if (res.data.response?.cEwbNo) {
-      allEwbs.push({ ewbNo: res.data.response.cEwbNo });
+      const updated = { ...saved, cewbResponse: res.data.response, allEwbs };
+      localStorage.setItem(LATEST_EWB_KEY, JSON.stringify(updated));
+    } catch (err) {
+      console.error("❌ API Error:", err);
+      setError(err?.response?.data?.message || err.message || "API Error");
+      setResponse(err?.response?.data || null);
+    } finally {
+      setLoading(false);
     }
-
-    const updated = {
-      ...saved,
-      cewbResponse: res.data.response,
-      allEwbs,
-    };
-
-    console.log("💾 Saving CEWB:", updated);
-    localStorage.setItem(LATEST_EWB_KEY, JSON.stringify(updated));
-  } catch (err) {
-    console.error("❌ API Error:", err);
-    setError(err?.response?.data?.message || err.message || "API Error");
-    setResponse(err?.response?.data || null);
-  } finally {
-    setLoading(false);
-  }
-};
-
+  };
 
   // --------------------------
   // UI
@@ -321,22 +236,16 @@ if (transMode.transMode === 0) {
       {response && (
         <div style={{ marginTop: 20 }}>
           <h3>API Response</h3>
-          <pre style={{ background: "#f5f5f5", padding: 10 }}>
-            {JSON.stringify(response, null, 2)}
-          </pre>
+          <pre style={{ background: "#f5f5f5", padding: 10 }}>{JSON.stringify(response, null, 2)}</pre>
         </div>
       )}
 
-      {/* Final Preview */}
+      {/* Final Payload & Headers */}
       <div style={{ marginTop: 20, border: "1px solid #ddd", padding: 10, borderRadius: 4 }}>
         <h3>Final Payload</h3>
-        <pre style={{ background: "#f5f5f5", padding: 10 }}>
-          {JSON.stringify(payload, null, 2)}
-        </pre>
+        <pre style={{ background: "#f5f5f5", padding: 10 }}>{JSON.stringify(payload, null, 2)}</pre>
         <h3>Headers</h3>
-        <pre style={{ background: "#f5f5f5", padding: 10 }}>
-          {JSON.stringify(headers, null, 2)}
-        </pre>
+        <pre style={{ background: "#f5f5f5", padding: 10 }}>{JSON.stringify(headers, null, 2)}</pre>
       </div>
     </div>
   );
