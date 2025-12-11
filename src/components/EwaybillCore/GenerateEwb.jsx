@@ -84,7 +84,7 @@ const GenerateEwb = () => {
   useEffect(() => {
     // Load login data
     const login = JSON.parse(localStorage.getItem(LOGIN_RESPONSE_KEY) || "{}");
-
+    console.log("login",login)
     setAuthData({
       companyId: login.companyId || "",
       token: login.token || "",
