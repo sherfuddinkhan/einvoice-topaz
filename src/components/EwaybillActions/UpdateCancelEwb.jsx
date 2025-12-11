@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import axios from "axios";
+import { useParams } from "react-router-dom";
 
 // LocalStorage keys
 const LOGIN_RESPONSE_KEY = "iris_login_data";
@@ -15,7 +16,7 @@ const load = (key) => {
 };
 
 const UpdateCancelEwb = () => {
-  // ---------------- AUTH DATA ----------------
+  const { ewbNo: routeEwbNo } = useParams(); // Get EWB number from URL
   const [auth, setAuth] = useState({
     token: "",
     headerCompanyId: "",
@@ -23,10 +24,8 @@ const UpdateCancelEwb = () => {
     payloadCompanyId: "",
   });
 
-  // ---------------- ACTION TYPE ----------------
   const [actionType, setActionType] = useState("UPDATE");
 
-  // ---------------- FORM DATA ----------------
   const [form, setForm] = useState({
     ewbNo: "",
     vehicleNo: "",
@@ -38,10 +37,8 @@ const UpdateCancelEwb = () => {
     transDocDate: "",
     transMode: 1,
     vehicleType: "R",
-
     cancelRsnCode: "1",
     cancelRmrk: "Order Cancelled",
-
     remainingDistance: "",
     extnRsnCode: "",
     extnRemarks: "",
@@ -50,12 +47,11 @@ const UpdateCancelEwb = () => {
     consignmentStatus: "M",
   });
 
-  // ---------------- UI STATES ----------------
   const [response, setResponse] = useState(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
-  // ---------------- LOAD LOCALSTORAGE ----------------
+  // ---------------- LOAD LOCALSTORAGE & PREFILL FORM ----------------
   useEffect(() => {
     const login = load(LOGIN_RESPONSE_KEY);
     const last = load(LATEST_EWB_KEY)?.response || {};
@@ -71,7 +67,7 @@ const UpdateCancelEwb = () => {
 
     setForm((prev) => ({
       ...prev,
-      ewbNo: last.ewbNo || "",
+      ewbNo: routeEwbNo || last.ewbNo || "",
       vehicleNo: last.vehicleNo || "",
       fromPlace: last.fromPlace || "",
       fromState: last.fromStateCode || "",
@@ -81,30 +77,26 @@ const UpdateCancelEwb = () => {
       vehicleType: last.vehicleType || "R",
       fromPincode: last.fromPincode || "",
     }));
-  }, []);
+  }, [routeEwbNo]);
 
-  // ---------------- CLEAR RESPONSE ON INPUT CHANGE ----------------
   const handleChange = (e) => {
     setForm({ ...form, [e.target.name]: e.target.value });
     setResponse(null);
     setError("");
   };
 
-  // ---------------- CHANGE PAYLOAD COMPANY ID ----------------
   const handleCompanyChange = (e) => {
     setAuth({ ...auth, payloadCompanyId: e.target.value });
     setResponse(null);
     setError("");
   };
 
-  // ---------------- CHANGE ACTION TYPE ----------------
   const handleActionChange = (e) => {
     setActionType(e.target.value);
-    setResponse(null); // 🔥 REQUIRED FIX
+    setResponse(null);
     setError("");
   };
 
-  // ---------------- HEADERS ----------------
   const headers = {
     "X-Auth-Token": auth.token,
     companyId: auth.headerCompanyId,
@@ -112,7 +104,6 @@ const UpdateCancelEwb = () => {
     "Content-Type": "application/json",
   };
 
-  // ---------------- PAYLOAD BUILDER ----------------
   const buildPayload = () => {
     const common = {
       ewbNo: form.ewbNo,
@@ -143,9 +134,6 @@ const UpdateCancelEwb = () => {
           cancelRmrk: form.cancelRmrk,
         };
 
-      case "REJECT":
-        return common;
-
       case "EXTENDVALIDITY":
         return {
           ...common,
@@ -168,7 +156,6 @@ const UpdateCancelEwb = () => {
     }
   };
 
-  // ---------------- SUBMIT ----------------
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
@@ -177,15 +164,12 @@ const UpdateCancelEwb = () => {
 
     try {
       const payload = buildPayload();
-
       const res = await axios.put(
         "http://localhost:3001/proxy/topaz/ewb/action",
         payload,
         { headers }
       );
-
       setResponse(res.data);
-
       if (res.data.status === "SUCCESS") {
         alert(`${actionType} completed for EWB ${form.ewbNo}`);
       }
@@ -206,9 +190,8 @@ const UpdateCancelEwb = () => {
 
   return (
     <div style={{ maxWidth: "720px", margin: "auto", padding: "20px" }}>
-      <h2>EWB Action</h2>
+      <h2>EWB Action: {form.ewbNo}</h2>
 
-      {/* COMPANY ID (EDITABLE PAYLOAD) */}
       <label>Payload Company ID (Editable)</label>
       <input
         style={inputStyle}
@@ -216,7 +199,6 @@ const UpdateCancelEwb = () => {
         onChange={handleCompanyChange}
       />
 
-      {/* ACTION DROPDOWN (CLEARS RESPONSE) */}
       <label>Action Type</label>
       <select
         style={inputStyle}
@@ -229,7 +211,6 @@ const UpdateCancelEwb = () => {
         <option value="EXTENDVALIDITY">Extend Validity</option>
       </select>
 
-      {/* FORM */}
       <form onSubmit={handleSubmit}>
         <input
           style={inputStyle}
@@ -273,32 +254,18 @@ const UpdateCancelEwb = () => {
           </>
         )}
 
-        <button
-          style={{ padding: "10px", marginTop: "10px" }}
-          disabled={loading}
-        >
+        <button style={{ padding: "10px", marginTop: "10px" }} disabled={loading}>
           {loading ? "Processing..." : `Submit ${actionType}`}
         </button>
       </form>
 
-      {/* ERROR */}
       {error && <p style={{ color: "red" }}>{error}</p>}
-
-      {/* RESPONSE */}
       {response && (
-        <pre
-          style={{
-            background: "#e9f5ff",
-            padding: "12px",
-            marginTop: "20px",
-            borderRadius: "5px",
-          }}
-        >
+        <pre style={{ background: "#e9f5ff", padding: "12px", marginTop: "20px", borderRadius: "5px" }}>
           {JSON.stringify(response, null, 2)}
         </pre>
       )}
 
-      {/* DEBUG */}
       <h3>Payload</h3>
       <pre style={{ background: "#f4f4f4", padding: "12px" }}>
         {JSON.stringify(buildPayload(), null, 2)}

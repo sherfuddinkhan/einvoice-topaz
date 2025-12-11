@@ -12,7 +12,6 @@ const FetchByDate = () => {
   const [userGstin, setUserGstin] = useState("");
 
   const [headersUI, setHeadersUI] = useState({});
-  const [payloadUI, setPayloadUI] = useState({});
   const [response, setResponse] = useState([]);
 
   // ----------------------------------------
@@ -22,14 +21,12 @@ const FetchByDate = () => {
     const login = JSON.parse(localStorage.getItem(LOGIN_KEY) || "{}");
     const latest = JSON.parse(localStorage.getItem(LATEST_EWB_KEY) || "{}");
 
-    const headers = {
+    setHeadersUI({
       accept: "application/json",
       product: "TOPAZ",
       companyid: login.companyId || "",
       "x-auth-token": login.token || "",
-    };
-
-    setHeadersUI(headers);
+    });
 
     const latestDate = latest?.response?.ewbDate?.split(" ")[0] || "";
     setDate(latestDate);
@@ -53,23 +50,19 @@ const FetchByDate = () => {
       userGstin,
     };
 
-    setPayloadUI(payload);
-
     try {
       const res = await axios.get(
         "http://localhost:3001/proxy/topaz/ewb/fetchByDate",
         { params: payload, headers: headersUI }
       );
-
-      // Response array
       setResponse(res.data.response || []);
     } catch (error) {
       setResponse([]);
-      console.log("❌ ERROR:", error);
+      console.error("❌ ERROR:", error);
     }
   };
 
-  // Redirect to EWB Action page
+  // Redirect to EWB Actions page
   const goToEwbAction = (ewbNo) => {
     navigate(`/ewb-action/${ewbNo}`);
   };
@@ -150,7 +143,6 @@ const FetchByDate = () => {
                 <td>{row.validUpto}</td>
                 <td>{row.status}</td>
                 <td>{row.delPlace}</td>
-
                 <td>
                   <button
                     onClick={() => goToEwbAction(row.ewbNo)}
